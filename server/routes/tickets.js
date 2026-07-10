@@ -1,6 +1,9 @@
 const router = require('express').Router();
+const multer = require('multer');
 const ctrl = require('../controllers/ticketController');
 const { protect, authorize, staffOnly } = require('../middleware/auth');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.use(protect);
 
@@ -12,6 +15,8 @@ router.post('/', ctrl.create);
 
 router.get('/:id', ctrl.get);
 router.post('/:id/reply', ctrl.reply);
+router.post('/:id/read', ctrl.markRead);
+router.post('/:id/attachments', upload.array('files', 6), ctrl.uploadAttachments);
 
 // Only staff can change ticket fields / assignment.
 router.patch('/:id', staffOnly, ctrl.update);

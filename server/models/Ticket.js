@@ -16,10 +16,26 @@ const messageSchema = new mongoose.Schema(
       enum: ['client', 'agent', 'system'],
       default: 'agent',
     },
-    body: { type: String, required: true },
+    body: { type: String, default: '' },
+    // File attachments (references into the Attachment collection).
+    attachments: [
+      {
+        ref: { type: mongoose.Schema.Types.ObjectId, ref: 'Attachment' },
+        name: { type: String },
+        type: { type: String }, // explicit — "type" is a reserved key in Mongoose
+        size: { type: Number },
+      },
+    ],
     // Internal notes are visible to agents/admins only, never to the client.
     isInternalNote: { type: Boolean, default: false },
     via: { type: String, enum: ['web', 'email'], default: 'web' },
+    // Read receipts — who has received / seen this message.
+    deliveredTo: [
+      { user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, at: Date },
+    ],
+    readBy: [
+      { user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, at: Date },
+    ],
   },
   { timestamps: true }
 );

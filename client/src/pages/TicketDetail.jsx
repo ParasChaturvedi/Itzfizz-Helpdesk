@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Send, Lock, Clock, Building2, UserCog, Flag, Activity, Trash2, Mail,
-  CheckCircle2, RotateCcw,
+  CheckCircle2, RotateCcw, Paperclip, Check, CheckCheck, FileText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
@@ -22,17 +22,21 @@ export default function TicketDetail() {
   const [reply, setReply] = useState('');
   const [internal, setInternal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [pending, setPending] = useState([]); // uploaded-but-not-yet-sent attachments
+  const [uploading, setUploading] = useState(false);
   const threadEnd = useRef(null);
+  const fileRef = useRef(null);
 
   const staff = isStaff();
   const admin = isAdmin();
 
   const load = () =>
     api.get(`/tickets/${id}`).then((r) => setTicket(r.data.ticket));
+  const markRead = () => api.post(`/tickets/${id}/read`).catch(() => {});
 
   useEffect(() => {
     setLoading(true);
-    const calls = [load(), api.get('/tickets/meta/options').then((r) => setOptions(r.data))];
+    const calls = [load().then(markRead), api.get('/tickets/meta/options').then((r) => setOptions(r.data))];
     if (admin) calls.push(api.get('/users/agents').then((r) => setAgents(r.data.agents)));
     Promise.all(calls)
       .catch((e) => toast.error(e.response?.data?.message || 'Failed to load ticket'))
@@ -40,12 +44,14 @@ export default function TicketDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Live-refresh the discussion every 10s (chat feel) while the tab is visible.
+  // Live-refresh + read-receipt ping every 10s while the tab is visible.
   useEffect(() => {
     const iv = setInterval(() => {
-      if (!document.hidden) load().catch(() => {});
+      if (!document.hidden) load().then(markRead).catch(() => {});
     }, 10000);
-    return () => clearInterval(iv);
+    const onFocus = () => { if (!document.hidden) load().then(markRead).catch(() => {}); };
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(iv); window.removeEventListener('focus', onFocus); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -53,18 +59,40 @@ export default function TicketDetail() {
     threadEnd.current?.scrollIntoView({ behavior: 'smooth' });
   }, [ticket?.messages?.length]);
 
+  const onPickFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    if (files.some((f) => f.size > 5 * 1024 * 1024)) return toast.error('Each file must be under 5 MB');
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append('files', f));
+      const { data } = await api.post(`/tickets/${id}/attachments`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setPending((p) => [...p, ...data.attachments]);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const sendReply = async (e) => {
     e.preventDefault();
-    if (!reply.trim()) return;
+    if (!reply.trim() && pending.length === 0) return;
     setSending(true);
     try {
       const { data } = await api.post(`/tickets/${id}/reply`, {
         body: reply,
         isInternalNote: internal,
+        attachments: pending,
       });
       setTicket(data.ticket);
       setReply('');
       setInternal(false);
+      setPending([]);
       toast.success(internal ? 'Internal note added' : 'Reply sent');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to send');
@@ -169,15 +197,35 @@ export default function TicketDetail() {
               value={reply}
               onChange={(e) => setReply(e.target.value)}
             />
-            <div className="mt-3 flex items-center justify-between">
-              {staff ? (
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-500">
-                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-brand-600"
-                    checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-                  Internal note
-                </label>
-              ) : <span />}
-              <button className="btn-primary" disabled={sending || !reply.trim()}>
+
+            {pending.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {pending.map((a, i) => (
+                  <span key={i} className="chip bg-slate-100 text-slate-600">
+                    <Paperclip className="h-3 w-3" /> {a.name}
+                    <button type="button" onClick={() => setPending((p) => p.filter((_, j) => j !== i))}
+                      className="ml-1 text-slate-400 hover:text-red-500">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <input ref={fileRef} type="file" multiple className="hidden" onChange={onPickFiles} />
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                  className="btn-ghost !px-3" title="Attach files">
+                  <Paperclip className="h-4 w-4" /> {uploading ? 'Uploading…' : 'Attach'}
+                </button>
+                {staff && (
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-500">
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-brand-600"
+                      checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+                    Internal note
+                  </label>
+                )}
+              </div>
+              <button className="btn-primary" disabled={sending || (!reply.trim() && pending.length === 0)}>
                 <Send className="h-4 w-4" /> {sending ? 'Sending…' : internal ? 'Add note' : 'Send reply'}
               </button>
             </div>
@@ -296,12 +344,49 @@ export default function TicketDetail() {
   );
 }
 
+function Attachment({ a }) {
+  const url = `/api/attachments/${a.ref}`;
+  const isImg = (a.type || '').startsWith('image/');
+  if (isImg) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" title={a.name}>
+        <img src={url} alt={a.name} className="max-h-44 rounded-lg border border-slate-200 object-cover" />
+      </a>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noreferrer"
+      className="chip bg-slate-100 text-slate-600 hover:bg-slate-200">
+      <FileText className="h-3.5 w-3.5" /> {a.name}
+    </a>
+  );
+}
+
+function Receipt({ m }) {
+  const read = m.readBy || [];
+  const delivered = m.deliveredTo || [];
+  let Icon = Check, cls = 'text-slate-400', label = 'Sent';
+  if (read.length) {
+    Icon = CheckCheck; cls = 'text-brand-600';
+    const names = read.map((r) => r.user?.name).filter(Boolean);
+    label = names.length ? `Seen by ${names.join(', ')}` : 'Seen';
+  } else if (delivered.length) {
+    Icon = CheckCheck; label = 'Delivered';
+  }
+  return (
+    <div className={`mt-1 flex items-center justify-end gap-1 text-[11px] ${cls}`}>
+      <Icon className="h-3.5 w-3.5" /> <span>{label}</span>
+    </div>
+  );
+}
+
 function Message({ m, me }) {
   const mine = String(m.author?._id || m.author) === String(me._id);
   const isSystem = m.authorType === 'system';
   if (isSystem) {
     return <div className="text-center text-xs text-slate-400">{m.body}</div>;
   }
+  const atts = m.attachments || [];
   return (
     <div className={`flex gap-3 ${mine ? 'flex-row-reverse' : ''}`}>
       <Avatar name={m.author?.name || m.authorName} color={m.author?.avatarColor} size={36} />
@@ -312,18 +397,26 @@ function Message({ m, me }) {
           {m.via === 'email' && <span title="Received by email">✉</span>}
           <span>{fullDate(m.createdAt)}</span>
         </div>
-        <div
-          className={`whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-            m.isInternalNote
-              ? 'bg-amber-50 text-amber-900 ring-1 ring-amber-200'
-              : mine
-              ? 'bg-brand-600 text-white'
-              : 'bg-slate-100 text-slate-700'
-          }`}
-        >
-          {m.isInternalNote && <span className="mb-1 block text-xs font-semibold opacity-70">🔒 Internal note</span>}
-          {m.body}
-        </div>
+        {m.body && (
+          <div
+            className={`inline-block whitespace-pre-wrap rounded-2xl px-4 py-3 text-left text-sm leading-relaxed ${
+              m.isInternalNote
+                ? 'bg-amber-50 text-amber-900 ring-1 ring-amber-200'
+                : mine
+                ? 'bg-brand-600 text-white'
+                : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            {m.isInternalNote && <span className="mb-1 block text-xs font-semibold opacity-70">🔒 Internal note</span>}
+            {m.body}
+          </div>
+        )}
+        {atts.length > 0 && (
+          <div className={`mt-1.5 flex flex-wrap gap-2 ${mine ? 'justify-end' : ''}`}>
+            {atts.map((a, i) => <Attachment key={i} a={a} />)}
+          </div>
+        )}
+        {mine && !m.isInternalNote && <Receipt m={m} />}
       </div>
     </div>
   );

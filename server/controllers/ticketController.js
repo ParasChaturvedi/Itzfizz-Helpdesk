@@ -171,17 +171,36 @@ exports.stats = async (req, res) => {
   });
 };
 
+// Populate receipts for display.
+const RECEIPT_POP = [
+  { path: 'assignee', select: 'name email avatarColor department' },
+  { path: 'requester', select: 'name email avatarColor' },
+  { path: 'messages.author', select: 'name email avatarColor role' },
+  { path: 'messages.readBy.user', select: 'name avatarColor' },
+  { path: 'messages.deliveredTo.user', select: 'name' },
+];
+
 // GET /api/tickets/:id
 exports.get = async (req, res) => {
-  const ticket = await Ticket.findById(req.params.id)
-    .populate('assignee', 'name email avatarColor department')
-    .populate('requester', 'name email avatarColor')
-    .populate('messages.author', 'name email avatarColor role');
+  const ticket = await Ticket.findById(req.params.id).populate(RECEIPT_POP);
   if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
   if (!canAccess(req.user, ticket)) {
     return res.status(403).json({ message: 'You do not have access to this ticket' });
   }
+
+  // Mark incoming messages as delivered to this viewer.
+  let touched = false;
+  for (const m of ticket.messages) {
+    const authorId = String(m.author?._id || m.author || '');
+    if (authorId === String(req.user._id)) continue;
+    if (!m.deliveredTo.some((d) => String(d.user?._id || d.user) === String(req.user._id))) {
+      m.deliveredTo.push({ user: req.user._id, at: new Date() });
+      touched = true;
+    }
+  }
+  if (touched) await ticket.save();
+
   res.json({ ticket: serialize(ticket, req.user) });
 };
 
@@ -224,7 +243,10 @@ exports.create = async (req, res) => {
 // POST /api/tickets/:id/reply  — add a message or internal note
 exports.reply = async (req, res) => {
   const { body, isInternalNote } = req.body;
-  if (!body) return res.status(400).json({ message: 'Message body is required' });
+  const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
+  if (!body && attachments.length === 0) {
+    return res.status(400).json({ message: 'Add a message or an attachment' });
+  }
 
   const ticket = await Ticket.findById(req.params.id);
   if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
@@ -241,7 +263,8 @@ exports.reply = async (req, res) => {
     authorName: req.user.name,
     authorEmail: req.user.email,
     authorType: client ? 'client' : 'agent',
-    body,
+    body: body || '',
+    attachments: attachments.map((a) => ({ ref: a.ref, name: a.name, type: a.type, size: a.size })),
     isInternalNote: internal,
     via: 'web',
   });
@@ -269,8 +292,53 @@ exports.reply = async (req, res) => {
     }
   }
 
-  const populated = await ticket.populate('messages.author', 'name email avatarColor role');
+  const populated = await ticket.populate(RECEIPT_POP);
   res.status(201).json({ ticket: serialize(populated, req.user) });
+};
+
+// POST /api/tickets/:id/attachments  — upload files (multipart), returns refs.
+exports.uploadAttachments = async (req, res) => {
+  const Attachment = require('../models/Attachment');
+  const ticket = await Ticket.findById(req.params.id).select('requester assignee');
+  if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+  if (!canAccess(req.user, ticket)) {
+    return res.status(403).json({ message: 'You do not have access to this ticket' });
+  }
+  const files = req.files || [];
+  if (!files.length) return res.status(400).json({ message: 'No files uploaded' });
+
+  const saved = [];
+  for (const f of files) {
+    const doc = await Attachment.create({
+      ticket: ticket._id,
+      name: f.originalname,
+      type: f.mimetype,
+      size: f.size,
+      data: f.buffer,
+      uploadedBy: req.user._id,
+    });
+    saved.push({ ref: doc._id, name: doc.name, type: doc.type, size: doc.size });
+  }
+  res.status(201).json({ attachments: saved });
+};
+
+// POST /api/tickets/:id/read  — mark all incoming messages as read by me.
+exports.markRead = async (req, res) => {
+  const ticket = await Ticket.findById(req.params.id);
+  if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+  if (!canAccess(req.user, ticket)) {
+    return res.status(403).json({ message: 'You do not have access to this ticket' });
+  }
+  const me = String(req.user._id);
+  let touched = false;
+  for (const m of ticket.messages) {
+    if (String(m.author || '') === me) continue;
+    const has = (arr) => arr.some((x) => String(x.user?._id || x.user) === me);
+    if (!has(m.deliveredTo)) { m.deliveredTo.push({ user: req.user._id, at: new Date() }); touched = true; }
+    if (!has(m.readBy)) { m.readBy.push({ user: req.user._id, at: new Date() }); touched = true; }
+  }
+  if (touched) await ticket.save();
+  res.json({ ok: true });
 };
 
 // PATCH /api/tickets/:id  — staff updates fields (status, assignee, etc.)
@@ -342,9 +410,7 @@ exports.update = async (req, res) => {
   // Notify the newly assigned team member AND the client (email + WhatsApp).
   if (newlyAssigned) notifyAssignment(ticket, newlyAssigned);
 
-  const populated = await ticket
-    .populate('assignee', 'name email avatarColor department')
-    .then((t) => t.populate('requester', 'name email avatarColor'));
+  const populated = await ticket.populate(RECEIPT_POP);
   res.json({ ticket: serialize(populated, req.user) });
 };
 
