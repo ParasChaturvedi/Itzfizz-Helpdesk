@@ -20,14 +20,31 @@ const ROLE_LABELS = {
 const roleLabel = (r) => ROLE_LABELS[r] || r;
 const statusLabel = (s) => (s || '').replace('_', ' ');
 
-// Clients may only ever touch their own tickets.
-function scopeFor(user) {
-  if (user.role === 'client') return { requester: user._id };
-  return {};
-}
-
 function isStaff(user) {
   return user.isStaff === true || User.STAFF_ROLES.includes(user.role);
+}
+function isAdmin(user) {
+  return user.role === 'admin';
+}
+
+// Visibility scope. A ticket is a private discussion between the client who
+// raised it, the team member it's assigned to, and admins.
+//   admin  → every ticket (they triage & assign)
+//   client → only tickets they raised
+//   staff  → only tickets assigned to them
+function scopeFor(user) {
+  if (isAdmin(user)) return {};
+  if (user.role === 'client') return { requester: user._id };
+  return { assignee: user._id };
+}
+
+// Can this user open / discuss this specific ticket?
+function canAccess(user, ticket) {
+  if (isAdmin(user)) return true;
+  const reqId = String(ticket.requester?._id || ticket.requester || '');
+  const asgId = String(ticket.assignee?._id || ticket.assignee || '');
+  if (user.role === 'client') return reqId === String(user._id);
+  return asgId === String(user._id); // staff: only if assigned to them
 }
 
 // Compute the SLA due date from a priority using the configured hours.
@@ -141,7 +158,7 @@ exports.stats = async (req, res) => {
     Ticket.aggregate([{ $match: base }, { $group: { _id: '$priority', n: { $sum: 1 } } }]),
     Ticket.countDocuments(base),
     isStaff(req.user) ? Ticket.countDocuments({ assignee: req.user._id }) : 0,
-    isStaff(req.user) ? Ticket.countDocuments({ assignee: null }) : 0,
+    isAdmin(req.user) ? Ticket.countDocuments({ assignee: null }) : 0,
   ]);
 
   const toMap = (rows) => rows.reduce((a, r) => ({ ...a, [r._id]: r.n }), {});
@@ -162,8 +179,8 @@ exports.get = async (req, res) => {
     .populate('messages.author', 'name email avatarColor role');
   if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
-  if (req.user.role === 'client' && String(ticket.requester?._id) !== String(req.user._id)) {
-    return res.status(403).json({ message: 'Not your ticket' });
+  if (!canAccess(req.user, ticket)) {
+    return res.status(403).json({ message: 'You do not have access to this ticket' });
   }
   res.json({ ticket: serialize(ticket, req.user) });
 };
@@ -213,8 +230,8 @@ exports.reply = async (req, res) => {
   if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
   const client = req.user.role === 'client';
-  if (client && String(ticket.requester) !== String(req.user._id)) {
-    return res.status(403).json({ message: 'Not your ticket' });
+  if (!canAccess(req.user, ticket)) {
+    return res.status(403).json({ message: 'You do not have access to this ticket' });
   }
   // Only staff can post internal notes.
   const internal = !!isInternalNote && isStaff(req.user);
@@ -261,7 +278,16 @@ exports.update = async (req, res) => {
   const ticket = await Ticket.findById(req.params.id);
   if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
+  // Only admin or the assigned team member may change a ticket.
+  if (!canAccess(req.user, ticket)) {
+    return res.status(403).json({ message: 'You do not have access to this ticket' });
+  }
+
   const { status, priority, department, assignee, estimatedTime, dueDate, tags } = req.body;
+  // Routing (assign / department) is admin-only; the assignee handles the work.
+  if ((assignee !== undefined || department !== undefined) && !isAdmin(req.user)) {
+    return res.status(403).json({ message: 'Only an admin can assign or change department' });
+  }
   const changes = [];
   let statusChanged = false;
   let newlyAssigned = null;

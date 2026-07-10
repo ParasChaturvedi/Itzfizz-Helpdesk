@@ -25,6 +25,7 @@ export default function TicketDetail() {
   const threadEnd = useRef(null);
 
   const staff = isStaff();
+  const admin = isAdmin();
 
   const load = () =>
     api.get(`/tickets/${id}`).then((r) => setTicket(r.data.ticket));
@@ -32,10 +33,19 @@ export default function TicketDetail() {
   useEffect(() => {
     setLoading(true);
     const calls = [load(), api.get('/tickets/meta/options').then((r) => setOptions(r.data))];
-    if (staff) calls.push(api.get('/users/agents').then((r) => setAgents(r.data.agents)));
+    if (admin) calls.push(api.get('/users/agents').then((r) => setAgents(r.data.agents)));
     Promise.all(calls)
       .catch((e) => toast.error(e.response?.data?.message || 'Failed to load ticket'))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Live-refresh the discussion every 10s (chat feel) while the tab is visible.
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (!document.hidden) load().catch(() => {});
+    }, 10000);
+    return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -131,6 +141,13 @@ export default function TicketDetail() {
         {/* Conversation */}
         <div className="lg:col-span-2 space-y-4">
           <div className="card p-4 sm:p-5">
+            <div className="mb-4 flex items-center gap-1.5 border-b border-slate-100 pb-3 text-xs text-slate-400">
+              <Lock className="h-3.5 w-3.5" />
+              Private discussion — only the client, the assigned member{staff ? ' and admins' : ''} can see this.
+              <span className="ml-auto flex items-center gap-1 text-emerald-500">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> live
+              </span>
+            </div>
             <div className="space-y-5">
               {ticket.messages.map((m) => (
                 <Message key={m._id} m={m} me={user} />
@@ -198,22 +215,32 @@ export default function TicketDetail() {
                   </select>
                 </Control>
 
-                <Control icon={Building2} label="Department">
-                  <select className="input" value={ticket.department}
-                    onChange={(e) => patch({ department: e.target.value }, 'Department updated')}>
-                    {options.departments.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </Control>
+                {admin ? (
+                  <Control icon={Building2} label="Department">
+                    <select className="input" value={ticket.department}
+                      onChange={(e) => patch({ department: e.target.value }, 'Department updated')}>
+                      {options.departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </Control>
+                ) : (
+                  <Row icon={Building2} label="Department"><span className="text-sm text-slate-700">{ticket.department}</span></Row>
+                )}
 
-                <Control icon={UserCog} label="Assignee">
-                  <select className="input" value={ticket.assignee?._id || ''}
-                    onChange={(e) => patch({ assignee: e.target.value || null }, 'Assignment updated')}>
-                    <option value="">Unassigned</option>
-                    {agents.map((a) => (
-                      <option key={a._id} value={a._id}>{a.name}{a.department ? ` · ${a.department}` : ''}</option>
-                    ))}
-                  </select>
-                </Control>
+                {admin ? (
+                  <Control icon={UserCog} label="Assignee">
+                    <select className="input" value={ticket.assignee?._id || ''}
+                      onChange={(e) => patch({ assignee: e.target.value || null }, 'Assignment updated')}>
+                      <option value="">Unassigned</option>
+                      {agents.map((a) => (
+                        <option key={a._id} value={a._id}>{a.name}{a.department ? ` · ${a.department}` : ''}</option>
+                      ))}
+                    </select>
+                  </Control>
+                ) : (
+                  <Row icon={UserCog} label="Assigned to">
+                    <span className="text-sm text-slate-700">{ticket.assignee?.name || 'You'}</span>
+                  </Row>
+                )}
 
                 <Control icon={Clock} label="Estimated time">
                   <input className="input" defaultValue={ticket.estimatedTime}
