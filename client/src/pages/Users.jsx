@@ -8,6 +8,7 @@ import { ROLE_META, roleLabel } from '../lib/ui';
 
 const DEPARTMENTS = ['', 'General', 'Design', 'Development', 'Sales', 'Billing'];
 const ROLES = Object.keys(ROLE_META); // admin, developer, designer, content_writer, hr, agent, client
+const TEAM_ROLES = ROLES.filter((r) => r !== 'client'); // staff roles only
 
 function randomPassword() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -18,7 +19,8 @@ export default function Users() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [modal, setModal] = useState(null); // null | 'client' | 'team'
+  const [filter, setFilter] = useState('all'); // all | team | client
 
   const load = () => api.get('/users').then((r) => setUsers(r.data.users)).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -59,7 +61,22 @@ export default function Users() {
           <h1 className="text-2xl font-extrabold text-slate-800">Team &amp; Clients</h1>
           <p className="text-sm text-slate-400">Provision accounts, set roles, departments and access.</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary"><UserPlus className="h-4 w-4" /> Add member</button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setModal('client')} className="btn-ghost"><UserPlus className="h-4 w-4" /> Add client</button>
+          <button onClick={() => setModal('team')} className="btn-primary"><UserPlus className="h-4 w-4" /> Add team member</button>
+        </div>
+      </div>
+
+      {/* Filter */}
+      <div className="flex gap-2">
+        {[['all', 'Everyone'], ['team', 'Team'], ['client', 'Clients']].map(([k, lbl]) => (
+          <button key={k} onClick={() => setFilter(k)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+              filter === k ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+            }`}>
+            {lbl}
+          </button>
+        ))}
       </div>
 
       {users.length === 0 ? (
@@ -78,7 +95,9 @@ export default function Users() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {users.map((u) => (
+                {users
+                  .filter((u) => filter === 'all' || (filter === 'client' ? u.role === 'client' : u.role !== 'client'))
+                  .map((u) => (
                   <tr key={u._id} className="hover:bg-slate-50/60">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
@@ -138,25 +157,36 @@ export default function Users() {
         </div>
       )}
 
-      {showModal && <AddModal onClose={() => setShowModal(false)} onCreated={(u) => setUsers((list) => [u, ...list])} />}
+      {modal && (
+        <AddModal
+          initialMode={modal}
+          onClose={() => setModal(null)}
+          onCreated={(u) => setUsers((list) => [u, ...list])}
+        />
+      )}
     </div>
   );
 }
 
-function AddModal({ onClose, onCreated }) {
+function AddModal({ initialMode, onClose, onCreated }) {
+  const [mode, setMode] = useState(initialMode); // 'client' | 'team'
   const [form, setForm] = useState({
     name: '', email: '', username: '', password: randomPassword(),
     role: 'developer', department: 'Development',
   });
   const [busy, setBusy] = useState(false);
+  const isClient = mode === 'client';
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      const { data } = await api.post('/users', form);
+      const payload = isClient
+        ? { name: form.name, email: form.email, password: form.password, role: 'client' }
+        : form;
+      const { data } = await api.post('/users', payload);
       onCreated(data.user);
-      toast.success('Member added — login details emailed to them ✉️');
+      toast.success(`${isClient ? 'Client' : 'Team member'} added — login details emailed ✉️`);
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add');
@@ -169,24 +199,39 @@ function AddModal({ onClose, onCreated }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <div className="w-full max-w-md animate-fade-up card p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">Add member</h2>
+          <h2 className="text-lg font-bold text-slate-800">Add {isClient ? 'client' : 'team member'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
         </div>
+
+        {/* Account type toggle */}
+        <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+          {[['client', 'Client'], ['team', 'Team member']].map(([k, lbl]) => (
+            <button key={k} type="button" onClick={() => setMode(k)}
+              className={`rounded-lg py-1.5 text-sm font-semibold transition ${
+                mode === k ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'
+              }`}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="label">Full name</label>
             <input className="input" value={form.name} required onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={isClient ? '' : 'grid grid-cols-2 gap-3'}>
             <div>
               <label className="label">Email</label>
               <input className="input" type="email" value={form.email} required onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
-            <div>
-              <label className="label">Username <span className="text-slate-300">(optional)</span></label>
-              <input className="input" value={form.username} placeholder="e.g. priya"
-                onChange={(e) => setForm({ ...form, username: e.target.value })} />
-            </div>
+            {!isClient && (
+              <div>
+                <label className="label">Username <span className="text-slate-300">(optional)</span></label>
+                <input className="input" value={form.username} placeholder="e.g. priya"
+                  onChange={(e) => setForm({ ...form, username: e.target.value })} />
+              </div>
+            )}
           </div>
           <div>
             <label className="label">Password (they can change it later)</label>
@@ -199,23 +244,30 @@ function AddModal({ onClose, onCreated }) {
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Role</label>
-              <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-              </select>
+          {!isClient && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Role</label>
+                <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                  {TEAM_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Department</label>
+                <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
+                  {DEPARTMENTS.filter(Boolean).map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="label">Department</label>
-              <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-                {DEPARTMENTS.filter(Boolean).map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
+          )}
+          {isClient && (
+            <p className="text-xs text-slate-400">
+              Clients can raise tickets and see only their own. They sign in with their email.
+            </p>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
-            <button className="btn-primary" disabled={busy}>{busy ? 'Adding…' : 'Add member'}</button>
+            <button className="btn-primary" disabled={busy}>{busy ? 'Adding…' : `Add ${isClient ? 'client' : 'member'}`}</button>
           </div>
         </form>
       </div>
