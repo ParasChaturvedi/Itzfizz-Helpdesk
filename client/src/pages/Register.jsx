@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, ArrowRight, Phone } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../store/auth';
 import { AuthShell, Field } from './Login';
@@ -8,7 +8,7 @@ import { AuthShell, Field } from './Login';
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
@@ -16,7 +16,7 @@ export default function Register() {
     if (form.password.length < 6) return toast.error('Password must be at least 6 characters');
     setBusy(true);
     try {
-      const user = await register(form.name, form.email, form.password, form.phone);
+      const user = await register(form.name, form.email, form.password);
       toast.success(user.role === 'admin' ? 'Admin account created 🎉' : 'Account created!');
       navigate('/', { replace: true });
     } catch (err) {
@@ -38,8 +38,6 @@ export default function Register() {
           onChange={(v) => setForm({ ...form, email: v })} placeholder="you@company.com" />
         <Field icon={Lock} label="Password" type="password" value={form.password}
           onChange={(v) => setForm({ ...form, password: v })} placeholder="At least 6 characters" />
-        <Field icon={Phone} label="WhatsApp number (optional)" value={form.phone} required={false}
-          onChange={(v) => setForm({ ...form, phone: v })} placeholder="+9198XXXXXXXX — for ticket alerts" />
         <button className="btn-primary w-full !py-2.5" disabled={busy}>
           {busy ? 'Creating…' : 'Create account'} <ArrowRight className="h-4 w-4" />
         </button>

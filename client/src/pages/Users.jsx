@@ -146,7 +146,7 @@ export default function Users() {
 function AddModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     name: '', email: '', username: '', password: randomPassword(),
-    role: 'developer', department: 'Development', phone: '',
+    role: 'developer', department: 'Development',
   });
   const [busy, setBusy] = useState(false);
 
@@ -212,11 +212,6 @@ function AddModal({ onClose, onCreated }) {
                 {DEPARTMENTS.filter(Boolean).map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
-          </div>
-          <div>
-            <label className="label">WhatsApp number <span className="text-slate-300">(optional)</span></label>
-            <input className="input" value={form.phone} placeholder="+9198XXXXXXXX"
-              onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>

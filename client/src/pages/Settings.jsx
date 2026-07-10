@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Upload, Trash2, Save, Palette, Timer, MessageCircle } from 'lucide-react';
+import { Upload, Trash2, Save, Palette, Timer, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useSettings } from '../store/settings';
@@ -104,16 +104,13 @@ export default function Settings() {
         <p className="text-xs text-slate-400">New tickets get a “due by” target based on their priority. Overdue tickets are flagged in red.</p>
       </div>
 
-      {/* WhatsApp help */}
-      <div className="card p-6 space-y-3">
-        <h2 className="flex items-center gap-2 font-bold text-slate-800"><MessageCircle className="h-4 w-4 text-brand-600" /> WhatsApp notifications</h2>
+      {/* Notifications note */}
+      <div className="card p-6 space-y-2">
+        <h2 className="flex items-center gap-2 font-bold text-slate-800"><Mail className="h-4 w-4 text-brand-600" /> Email notifications</h2>
         <p className="text-sm text-slate-500">
-          Assignees get a WhatsApp alert when a ticket is assigned to them. Two free options:
+          Clients, admins and assignees are automatically emailed on new tickets, assignments,
+          replies and status changes. No setup needed here.
         </p>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-slate-500">
-          <li><b>CallMeBot (free):</b> each teammate adds their personal API key + phone under <b>Profile</b>. No server config needed.</li>
-          <li><b>Meta WhatsApp Cloud API:</b> set <code className="rounded bg-slate-100 px-1">WHATSAPP_TOKEN</code> and <code className="rounded bg-slate-100 px-1">WHATSAPP_PHONE_ID</code> in your environment.</li>
-        </ul>
       </div>
     </div>
   );
