@@ -165,12 +165,47 @@ function ticketAssignedEmail(ticket, agent) {
     html: shell(
       'A ticket was assigned to you',
       `<p>Hi ${agent.name || 'there'},</p>
-       <p>You have been assigned ticket <strong>${ticket.reference}</strong>.</p>
-       <p><strong>Subject:</strong> ${ticket.subject}<br/>
+       <p>${ticket.requesterName || 'A client'} raised this ticket and the admin has assigned it to you.</p>
+       <p><strong>Ticket:</strong> ${ticket.reference}<br/>
+          <strong>Subject:</strong> ${ticket.subject}<br/>
           <strong>Priority:</strong> ${ticket.priority}<br/>
           <strong>Department:</strong> ${ticket.department}</p>
        <p style="margin-top:16px">
          <a href="${appUrl()}/tickets/${ticket._id}" style="background:#4f46e5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open ticket</a>
+       </p>`
+    ),
+  };
+}
+
+// Sent to admins when a new ticket comes in.
+function ticketCreatedAdminEmail(ticket) {
+  return {
+    subject: `[${ticket.reference}] New ticket from ${ticket.requesterName || ticket.requesterEmail}`,
+    html: shell(
+      'A new ticket was raised',
+      `<p><strong>${ticket.requesterName || ticket.requesterEmail}</strong> just raised a ticket.</p>
+       <p><strong>Ticket:</strong> ${ticket.reference}<br/>
+          <strong>Subject:</strong> ${ticket.subject}<br/>
+          <strong>Priority:</strong> ${ticket.priority}<br/>
+          <strong>From:</strong> ${ticket.requesterEmail}</p>
+       <p style="margin-top:16px">
+         <a href="${appUrl()}/tickets/${ticket._id}" style="background:#4f46e5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Assign / view</a>
+       </p>`
+    ),
+  };
+}
+
+// Sent to the client when their ticket is assigned to a team member.
+function ticketAssignedClientEmail(ticket, agent, roleLabel) {
+  return {
+    subject: `[${ticket.reference}] Your ticket is now being handled`,
+    html: shell(
+      'Good news — your ticket is assigned',
+      `<p>Hi ${ticket.requesterName || 'there'},</p>
+       <p>Your ticket <strong>${ticket.reference}</strong> (“${ticket.subject}”) has been assigned to
+          <strong>${agent.name}</strong>${roleLabel ? ` (${roleLabel})` : ''}, who is now working on it.</p>
+       <p style="margin-top:16px">
+         <a href="${appUrl()}/tickets/${ticket._id}" style="background:#4f46e5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Track your ticket</a>
        </p>`
     ),
   };
@@ -182,4 +217,6 @@ module.exports = {
   ticketReplyEmail,
   ticketStatusEmail,
   ticketAssignedEmail,
+  ticketCreatedAdminEmail,
+  ticketAssignedClientEmail,
 };

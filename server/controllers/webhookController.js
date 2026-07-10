@@ -1,7 +1,20 @@
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
 const Settings = require('../models/Settings');
-const { sendEmail, ticketCreatedEmail } = require('../utils/email');
+const { sendEmail, ticketCreatedEmail, ticketCreatedAdminEmail } = require('../utils/email');
+const { sendWhatsApp } = require('../utils/notify');
+
+// Alert every admin about a new (email-sourced) ticket.
+async function alertAdmins(ticket) {
+  const admins = await User.find({ role: 'admin', active: true }).select('+whatsappApiKey');
+  for (const a of admins) {
+    if (a.email) sendEmail({ to: a.email, ...ticketCreatedAdminEmail(ticket) });
+    sendWhatsApp(
+      a,
+      `🆕 Nayi ticket ${ticket.reference} — ${ticket.requesterName || ticket.requesterEmail} ne email se raise ki: "${ticket.subject}". ${process.env.APP_URL || ''}/tickets/${ticket._id}`
+    );
+  }
+}
 
 async function slaDueFrom(priority = 'medium', from = new Date()) {
   const s = await Settings.get();
@@ -112,5 +125,6 @@ exports.inboundEmail = async (req, res) => {
   });
 
   sendEmail({ to: email, ...ticketCreatedEmail(ticket) });
+  alertAdmins(ticket);
   res.json({ ok: true, ticket: ticket.reference, action: 'created' });
 };

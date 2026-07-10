@@ -24,8 +24,8 @@ export const useAuth = create((set, get) => ({
     return data.user;
   },
 
-  async register(name, email, password) {
-    const { data } = await api.post('/auth/register', { name, email, password });
+  async register(name, email, password, phone) {
+    const { data } = await api.post('/auth/register', { name, email, password, phone });
     localStorage.setItem('itzfizz_token', data.token);
     set({ user: data.user });
     return data.user;

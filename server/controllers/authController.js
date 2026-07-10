@@ -17,7 +17,7 @@ function palette(seed) {
 
 // POST /api/auth/register  — public self-signup always creates a "client".
 exports.register = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ message: 'Name, email and password are required' });
   }
@@ -29,6 +29,7 @@ exports.register = async (req, res) => {
     name,
     email,
     password,
+    phone: phone || '',
     role: isFirstUser ? 'admin' : 'client', // first ever account becomes admin
     avatarColor: palette(email),
   });

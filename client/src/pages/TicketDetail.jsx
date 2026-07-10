@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Send, Lock, Clock, Building2, UserCog, Flag, Activity, Trash2, Mail,
+  CheckCircle2, RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
@@ -101,10 +102,28 @@ export default function TicketDetail() {
             Opened by {ticket.requester?.name || ticket.requesterName} · {timeAgo(ticket.createdAt)}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <SlaBadge ticket={ticket} />
-          <PriorityBadge priority={ticket.priority} />
-          <StatusBadge status={ticket.status} />
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="flex flex-wrap items-center gap-2">
+            <SlaBadge ticket={ticket} />
+            <PriorityBadge priority={ticket.priority} />
+            <StatusBadge status={ticket.status} />
+          </div>
+          {staff &&
+            (['resolved', 'closed'].includes(ticket.status) ? (
+              <button
+                onClick={() => patch({ status: 'open' }, 'Ticket reopened — client notified')}
+                className="btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+              >
+                <RotateCcw className="h-4 w-4" /> Reopen ticket
+              </button>
+            ) : (
+              <button
+                onClick={() => patch({ status: 'resolved' }, 'Marked resolved — client notified ✅')}
+                className="btn bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Mark as Resolved
+              </button>
+            ))}
         </div>
       </div>
 
