@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import api from '../api/axios';
 
 export const useSettings = create((set) => ({
-  settings: { brandName: 'Itzfizz Helpdesk', logo: '', primaryColor: '#4f46e5' },
+  settings: { brandName: 'Itzfizz Helpdesk', logo: '', primaryColor: '#d45427' },
   loaded: false,
 
   async load() {

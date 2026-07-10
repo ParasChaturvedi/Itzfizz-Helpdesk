@@ -1,10 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* ── Itzfizz brand fonts (same CDN as the Doctor Fizz project) ── */
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/JUST%20Sans/JUST%20Sans%20Light.woff2') format('woff2');
+  font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/JUST%20Sans/JUST%20Sans%20Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/JUST%20Sans/JUST%20Sans%20Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/JUST%20Sans/JUST%20Sans%20SemiBold.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/JUST%20Sans/JUST%20Sans%20Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/JUST%20Sans/JUST%20Sans%20ExBold.woff2') format('woff2');
+  font-weight: 800; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Neue Machina';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/Neue%20Machina/NeueMachina-Regular.woff') format('woff');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Neue Machina';
+  src: url('https://itzfizzdigital.b-cdn.net/fonts/Neue%20Machina/NeueMachina-Ultrabold.woff') format('woff');
+  font-weight: 700 900; font-style: normal; font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
+  /* Doctor Fizz design tokens */
+  --app-bg: #f9fafb;
+  --panel: #ffffff;
+  --border: #e5e7eb;
+  --brand-grad: linear-gradient(to right, #d45427 0%, #ffa615 100%);
+  --accent: #d45427;
 }
 
 html,
@@ -14,8 +61,16 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
-  font-feature-settings: 'cv11', 'ss01';
+  @apply text-slate-800 antialiased;
+  background: var(--app-bg);
+  font-family: 'JUST Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Big titles / brand wordmark use the display face */
+.font-display,
+h1 {
+  font-family: 'Neue Machina', 'JUST Sans', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 @layer components {
@@ -24,7 +79,11 @@ body {
            focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm hover:shadow-lift;
+    @apply btn text-white shadow-sm hover:shadow-lift;
+    background-image: var(--brand-grad);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.04);
   }
   .btn-ghost {
     @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50;

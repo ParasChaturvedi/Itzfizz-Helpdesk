@@ -56,8 +56,8 @@ export function AuthShell({ children }) {
   const { settings } = useSettings();
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-brand-600 lg:block" style={{ background: settings.primaryColor }}>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.18),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(255,255,255,.12),transparent_40%)]" />
+      <div className="relative hidden overflow-hidden bg-brand-gradient lg:block">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.20),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(255,255,255,.12),transparent_40%)]" />
         <div className="relative flex h-full flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-2.5">
             {settings.logo ? (
@@ -67,7 +67,7 @@ export function AuthShell({ children }) {
                 <Headphones className="h-5 w-5" />
               </span>
             )}
-            <span className="text-xl font-extrabold">{settings.brandName}</span>
+            <span className="font-display text-xl font-extrabold">{settings.brandName}</span>
           </div>
           <div>
             <h2 className="max-w-sm text-3xl font-bold leading-snug">

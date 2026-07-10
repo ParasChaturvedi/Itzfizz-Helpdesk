@@ -8,7 +8,7 @@ const settingsSchema = new mongoose.Schema(
     // Company logo stored as a data URL (base64) so it survives serverless
     // deploys without external file storage. Keep it small (< ~200 KB).
     logo: { type: String, default: '' },
-    primaryColor: { type: String, default: '#4f46e5' },
+    primaryColor: { type: String, default: '#d45427' },
     // Resolution SLA in hours, per priority.
     slaHours: {
       urgent: { type: Number, default: 4 },

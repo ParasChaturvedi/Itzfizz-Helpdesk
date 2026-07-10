@@ -22,11 +22,11 @@ function SidebarContent({ user, onNavigate }) {
         {settings.logo ? (
           <img src={settings.logo} alt="logo" className="h-9 w-9 rounded-xl object-contain" />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-lift">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-lift">
             <Headphones className="h-5 w-5" />
           </span>
         )}
-        <span className="text-lg font-extrabold tracking-tight text-slate-800">{settings.brandName}</span>
+        <span className="font-display text-lg font-extrabold tracking-tight text-slate-800">{settings.brandName}</span>
       </Link>
 
       <nav className="flex-1 space-y-1 px-3 py-2">
