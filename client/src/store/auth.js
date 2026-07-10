@@ -17,8 +17,8 @@ export const useAuth = create((set, get) => ({
     }
   },
 
-  async login(email, password) {
-    const { data } = await api.post('/auth/login', { email, password });
+  async login(identifier, password) {
+    const { data } = await api.post('/auth/login', { identifier, password });
     localStorage.setItem('itzfizz_token', data.token);
     set({ user: data.user });
     return data.user;

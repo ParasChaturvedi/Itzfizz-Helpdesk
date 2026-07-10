@@ -40,4 +40,12 @@ function authorize(...roles) {
   };
 }
 
-module.exports = { protect, authorize };
+// Any staff member (admin, developer, designer, content_writer, hr, agent).
+function staffOnly(req, res, next) {
+  if (!req.user || !req.user.isStaff) {
+    return res.status(403).json({ message: 'Staff access required' });
+  }
+  next();
+}
+
+module.exports = { protect, authorize, staffOnly };

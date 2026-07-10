@@ -123,9 +123,27 @@ function ticketStatusEmail(ticket) {
   };
 }
 
+function ticketAssignedEmail(ticket, agent) {
+  return {
+    subject: `[${ticket.reference}] You've been assigned: ${ticket.subject}`,
+    html: shell(
+      'A ticket was assigned to you',
+      `<p>Hi ${agent.name || 'there'},</p>
+       <p>You have been assigned ticket <strong>${ticket.reference}</strong>.</p>
+       <p><strong>Subject:</strong> ${ticket.subject}<br/>
+          <strong>Priority:</strong> ${ticket.priority}<br/>
+          <strong>Department:</strong> ${ticket.department}</p>
+       <p style="margin-top:16px">
+         <a href="${appUrl()}/tickets/${ticket._id}" style="background:#4f46e5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open ticket</a>
+       </p>`
+    ),
+  };
+}
+
 module.exports = {
   sendEmail,
   ticketCreatedEmail,
   ticketReplyEmail,
   ticketStatusEmail,
+  ticketAssignedEmail,
 };

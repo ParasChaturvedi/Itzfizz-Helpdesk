@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Headphones, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Headphones, User, Lock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../store/auth';
+import { useSettings } from '../store/settings';
 
 export default function Login() {
   const { login } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ identifier: '', password: '' });
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await login(form.email, form.password);
+      await login(form.identifier, form.password);
       toast.success('Welcome back!');
       navigate(location.state?.from?.pathname || '/', { replace: true });
     } catch (err) {
@@ -27,12 +29,12 @@ export default function Login() {
 
   return (
     <AuthShell>
-      <h1 className="text-2xl font-extrabold text-slate-800">Sign in to Itzfizz Helpdesk</h1>
+      <h1 className="text-2xl font-extrabold text-slate-800">Sign in to {settings.brandName}</h1>
       <p className="mt-1 text-sm text-slate-400">Manage every request in one calm place.</p>
 
       <form onSubmit={submit} className="mt-7 space-y-4">
-        <Field icon={Mail} label="Email" type="email" value={form.email}
-          onChange={(v) => setForm({ ...form, email: v })} placeholder="you@company.com" />
+        <Field icon={User} label="Email or username" value={form.identifier}
+          onChange={(v) => setForm({ ...form, identifier: v })} placeholder="you@company.com" />
         <Field icon={Lock} label="Password" type="password" value={form.password}
           onChange={(v) => setForm({ ...form, password: v })} placeholder="••••••••" />
         <button className="btn-primary w-full !py-2.5" disabled={busy}>
@@ -51,16 +53,21 @@ export default function Login() {
 }
 
 export function AuthShell({ children }) {
+  const { settings } = useSettings();
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-brand-600 lg:block">
+      <div className="relative hidden overflow-hidden bg-brand-600 lg:block" style={{ background: settings.primaryColor }}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,.18),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(255,255,255,.12),transparent_40%)]" />
         <div className="relative flex h-full flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
-              <Headphones className="h-5 w-5" />
-            </span>
-            <span className="text-xl font-extrabold">Itzfizz Helpdesk</span>
+            {settings.logo ? (
+              <img src={settings.logo} alt="logo" className="h-10 w-10 rounded-xl object-contain bg-white/15 p-1" />
+            ) : (
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
+                <Headphones className="h-5 w-5" />
+              </span>
+            )}
+            <span className="text-xl font-extrabold">{settings.brandName}</span>
           </div>
           <div>
             <h2 className="max-w-sm text-3xl font-bold leading-snug">
@@ -72,11 +79,11 @@ export function AuthShell({ children }) {
             </p>
             <div className="mt-8 flex gap-6 text-sm text-white/70">
               <span>✓ Email → Ticket</span>
-              <span>✓ Roles &amp; Access</span>
+              <span>✓ SLA &amp; Roles</span>
               <span>✓ Assignments</span>
             </div>
           </div>
-          <span className="text-sm text-white/50">© {new Date().getFullYear()} Itzfizz Helpdesk</span>
+          <span className="text-sm text-white/50">© {new Date().getFullYear()} {settings.brandName}</span>
         </div>
       </div>
 

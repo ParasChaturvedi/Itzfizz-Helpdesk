@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const ctrl = require('../controllers/userController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize, staffOnly } = require('../middleware/auth');
 
 router.use(protect);
 
@@ -8,7 +8,7 @@ router.use(protect);
 router.patch('/me', ctrl.updateMe);
 
 // Staff can read the agent list (for assignee dropdowns)
-router.get('/agents', authorize('admin', 'agent'), ctrl.agents);
+router.get('/agents', staffOnly, ctrl.agents);
 
 // Admin-only user management
 router.get('/', authorize('admin'), ctrl.list);

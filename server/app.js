@@ -30,6 +30,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, service: 'itzfizz-help
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/tickets', require('./routes/tickets'));
+app.use('/api/settings', require('./routes/settings'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 
 app.use(notFound);

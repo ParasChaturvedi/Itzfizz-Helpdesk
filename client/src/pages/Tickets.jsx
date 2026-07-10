@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, Filter, Ticket as TicketIcon } from 'lucide-react';
+import { Search, Plus, Filter, Ticket as TicketIcon, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../store/auth';
-import { Spinner, StatusBadge, PriorityBadge, Avatar, EmptyState } from '../components/ui';
+import { Spinner, StatusBadge, PriorityBadge, SlaBadge, Avatar, EmptyState } from '../components/ui';
 import { timeAgo, STATUS_META } from '../lib/ui';
 
 const STATUS_TABS = ['all', 'open', 'in_progress', 'on_hold', 'resolved', 'closed'];
@@ -37,6 +38,24 @@ export default function Tickets() {
 
   const counts = useMemo(() => tickets.length, [tickets]);
 
+  const exportCsv = async () => {
+    try {
+      const params = {};
+      if (tab !== 'all') params.status = tab;
+      if (priority) params.priority = priority;
+      const res = await api.get('/tickets/export', { params, responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tickets-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('CSV exported');
+    } catch {
+      toast.error('Export failed');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -44,7 +63,12 @@ export default function Tickets() {
           <h1 className="text-2xl font-extrabold text-slate-800">Tickets</h1>
           <p className="text-sm text-slate-400">{counts} shown</p>
         </div>
-        <Link to="/tickets/new" className="btn-primary"><Plus className="h-4 w-4" /> New Ticket</Link>
+        <div className="flex items-center gap-2">
+          {isStaff() && (
+            <button onClick={exportCsv} className="btn-ghost"><Download className="h-4 w-4" /> Export CSV</button>
+          )}
+          <Link to="/tickets/new" className="btn-primary"><Plus className="h-4 w-4" /> New Ticket</Link>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -122,6 +146,7 @@ export default function Tickets() {
                 </div>
               </div>
               <div className="hidden shrink-0 items-center gap-2 md:flex">
+                <SlaBadge ticket={t} />
                 {t.assignee ? (
                   <span title={`Assigned to ${t.assignee.name}`}>
                     <Avatar name={t.assignee.name} color={t.assignee.avatarColor} size={28} />

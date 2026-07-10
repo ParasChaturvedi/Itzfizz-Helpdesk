@@ -55,6 +55,11 @@ const ticketSchema = new mongoose.Schema(
     estimatedTime: { type: String, default: '' }, // free text, e.g. "2-3 days"
     dueDate: { type: Date },
 
+    // SLA tracking.
+    slaDueAt: { type: Date }, // when a resolution is due, computed from priority
+    firstResponseAt: { type: Date }, // first staff reply
+    resolvedAt: { type: Date }, // when moved to resolved/closed
+
     source: { type: String, enum: ['web', 'email'], default: 'web' },
     messages: [messageSchema],
     activity: [activitySchema],

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './store/auth';
+import { useSettings } from './store/settings';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import { Spinner } from './components/ui';
@@ -13,14 +14,17 @@ import TicketDetail from './pages/TicketDetail';
 import NewTicket from './pages/NewTicket';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
+import SettingsPage from './pages/Settings';
 import NotFound from './pages/NotFound';
 
 export default function App() {
   const { bootstrap, loading, user } = useAuth();
+  const loadSettings = useSettings((s) => s.load);
 
   useEffect(() => {
     bootstrap();
-  }, [bootstrap]);
+    loadSettings();
+  }, [bootstrap, loadSettings]);
 
   if (loading) return <div className="grid h-screen place-items-center"><Spinner /></div>;
 
@@ -49,6 +53,14 @@ export default function App() {
           }
         />
         <Route path="/profile" element={<Profile />} />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       <Route path="*" element={<NotFound />} />

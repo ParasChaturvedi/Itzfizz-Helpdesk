@@ -1,5 +1,5 @@
-import { STATUS_META, PRIORITY_META, ROLE_META, initials } from '../lib/ui';
-import { Loader2, Inbox } from 'lucide-react';
+import { STATUS_META, PRIORITY_META, ROLE_META, initials, slaState } from '../lib/ui';
+import { Loader2, Inbox, Timer } from 'lucide-react';
 
 export function Avatar({ name = '?', color = '#6366f1', size = 36 }) {
   return (
@@ -35,6 +35,17 @@ export function PriorityBadge({ priority }) {
 export function RoleBadge({ role }) {
   const m = ROLE_META[role] || ROLE_META.client;
   return <span className={`chip ${m.cls}`}>{m.label}</span>;
+}
+
+export function SlaBadge({ ticket }) {
+  const s = slaState(ticket);
+  if (!s) return null;
+  return (
+    <span className={`chip ${s.cls}`} title="Resolution SLA">
+      <Timer className="h-3 w-3" />
+      {s.label}
+    </span>
+  );
 }
 
 export function Spinner({ label = 'Loading…' }) {

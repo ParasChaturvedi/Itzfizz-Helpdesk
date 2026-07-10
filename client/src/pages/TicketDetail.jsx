@@ -6,7 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../store/auth';
-import { Spinner, StatusBadge, PriorityBadge, Avatar } from '../components/ui';
+import { Spinner, StatusBadge, PriorityBadge, SlaBadge, Avatar } from '../components/ui';
 import { timeAgo, fullDate } from '../lib/ui';
 
 export default function TicketDetail() {
@@ -101,7 +101,8 @@ export default function TicketDetail() {
             Opened by {ticket.requester?.name || ticket.requesterName} · {timeAgo(ticket.createdAt)}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SlaBadge ticket={ticket} />
           <PriorityBadge priority={ticket.priority} />
           <StatusBadge status={ticket.status} />
         </div>

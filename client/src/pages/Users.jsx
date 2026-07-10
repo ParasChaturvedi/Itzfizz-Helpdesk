@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { UserPlus, Trash2, X, ShieldCheck } from 'lucide-react';
+import { UserPlus, Trash2, X, ShieldCheck, RefreshCw, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../store/auth';
 import { Spinner, Avatar, RoleBadge, EmptyState } from '../components/ui';
+import { ROLE_META, roleLabel } from '../lib/ui';
 
 const DEPARTMENTS = ['', 'General', 'Design', 'Development', 'Sales', 'Billing'];
+const ROLES = Object.keys(ROLE_META); // admin, developer, designer, content_writer, hr, agent, client
+
+function randomPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 export default function Users() {
   const { user: me } = useAuth();
@@ -23,6 +30,13 @@ export default function Users() {
     } catch (err) {
       toast.error(err.response?.data?.message || 'Update failed');
     }
+  };
+
+  const resetPassword = async (u) => {
+    const pw = randomPassword();
+    if (!confirm(`Reset password for ${u.name} to:\n\n${pw}\n\nShare it with them — they can change it later.`)) return;
+    await update(u._id, { password: pw });
+    toast.success('Password reset');
   };
 
   const remove = async (id) => {
@@ -43,7 +57,7 @@ export default function Users() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-800">Team &amp; Clients</h1>
-          <p className="text-sm text-slate-400">Manage roles, departments and access.</p>
+          <p className="text-sm text-slate-400">Provision accounts, set roles, departments and access.</p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn-primary"><UserPlus className="h-4 w-4" /> Add member</button>
       </div>
@@ -53,7 +67,7 @@ export default function Users() {
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="px-5 py-3 font-semibold">User</th>
@@ -73,7 +87,9 @@ export default function Users() {
                           <div className="font-medium text-slate-700">
                             {u.name} {u._id === me._id && <span className="text-xs text-slate-400">(you)</span>}
                           </div>
-                          <div className="text-xs text-slate-400">{u.email}</div>
+                          <div className="text-xs text-slate-400">
+                            {u.email}{u.username && <span className="text-slate-300"> · @{u.username}</span>}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -83,9 +99,7 @@ export default function Users() {
                       ) : (
                         <select className="input !w-auto !py-1.5" value={u.role}
                           onChange={(e) => update(u._id, { role: e.target.value })}>
-                          <option value="admin">Admin</option>
-                          <option value="agent">Agent</option>
-                          <option value="client">Client</option>
+                          {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                         </select>
                       )}
                     </td>
@@ -104,12 +118,17 @@ export default function Users() {
                         {u.active ? 'Active' : 'Disabled'}
                       </button>
                     </td>
-                    <td className="px-5 py-3 text-right">
-                      {u._id !== me._id && (
-                        <button onClick={() => remove(u._id)} className="text-slate-300 hover:text-red-500" title="Delete">
-                          <Trash2 className="h-4 w-4" />
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-end gap-3">
+                        <button onClick={() => resetPassword(u)} className="text-slate-300 hover:text-brand-600" title="Reset password">
+                          <KeyRound className="h-4 w-4" />
                         </button>
-                      )}
+                        {u._id !== me._id && (
+                          <button onClick={() => remove(u._id)} className="text-slate-300 hover:text-red-500" title="Delete">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -125,7 +144,10 @@ export default function Users() {
 }
 
 function AddModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent', department: 'General' });
+  const [form, setForm] = useState({
+    name: '', email: '', username: '', password: randomPassword(),
+    role: 'developer', department: 'Development', phone: '',
+  });
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
@@ -134,7 +156,7 @@ function AddModal({ onClose, onCreated }) {
     try {
       const { data } = await api.post('/users', form);
       onCreated(data.user);
-      toast.success('Member added');
+      toast.success('Member added — share the login details');
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add');
@@ -155,21 +177,33 @@ function AddModal({ onClose, onCreated }) {
             <label className="label">Full name</label>
             <input className="input" value={form.name} required onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
-          <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" value={form.email} required onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Email</label>
+              <input className="input" type="email" value={form.email} required onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Username <span className="text-slate-300">(optional)</span></label>
+              <input className="input" value={form.username} placeholder="e.g. priya"
+                onChange={(e) => setForm({ ...form, username: e.target.value })} />
+            </div>
           </div>
           <div>
-            <label className="label">Temporary password</label>
-            <input className="input" value={form.password} required minLength={6} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <label className="label">Password (they can change it later)</label>
+            <div className="flex gap-2">
+              <input className="input font-mono" value={form.password} required minLength={6}
+                onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <button type="button" className="btn-ghost !px-3" title="Generate"
+                onClick={() => setForm({ ...form, password: randomPassword() })}>
+                <RefreshCw className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Role</label>
               <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                <option value="admin">Admin</option>
-                <option value="agent">Agent</option>
-                <option value="client">Client</option>
+                {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
               </select>
             </div>
             <div>
@@ -178,6 +212,11 @@ function AddModal({ onClose, onCreated }) {
                 {DEPARTMENTS.filter(Boolean).map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
+          </div>
+          <div>
+            <label className="label">WhatsApp number <span className="text-slate-300">(optional)</span></label>
+            <input className="input" value={form.phone} placeholder="+9198XXXXXXXX"
+              onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>

@@ -38,13 +38,16 @@ exports.register = async (req, res) => {
   res.status(201).json({ token, user: user.toJSON() });
 };
 
-// POST /api/auth/login
+// POST /api/auth/login  — accepts email OR username as `identifier` (or `email`).
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required' });
+  const { email, identifier, password } = req.body;
+  const login = (identifier || email || '').toLowerCase().trim();
+  if (!login || !password) {
+    return res.status(400).json({ message: 'Email/username and password are required' });
   }
-  const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+  const user = await User.findOne({
+    $or: [{ email: login }, { username: login }],
+  }).select('+password');
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }

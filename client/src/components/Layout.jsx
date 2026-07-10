@@ -1,25 +1,32 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import {
-  LayoutDashboard, Ticket, Users, Plus, LogOut, Menu, X, UserCircle, Headphones,
+  LayoutDashboard, Ticket, Users, Plus, LogOut, Menu, X, Headphones, Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuth } from '../store/auth';
+import { useSettings } from '../store/settings';
 import { Avatar, RoleBadge } from './ui';
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/users', label: 'Team & Clients', icon: Users, roles: ['admin'] },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon, roles: ['admin'] },
 ];
 
 function SidebarContent({ user, onNavigate }) {
+  const { settings } = useSettings();
   return (
     <div className="flex h-full flex-col">
       <Link to="/" onClick={onNavigate} className="flex items-center gap-2.5 px-5 py-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-lift">
-          <Headphones className="h-5 w-5" />
-        </span>
-        <span className="text-lg font-extrabold tracking-tight text-slate-800">Itzfizz Helpdesk</span>
+        {settings.logo ? (
+          <img src={settings.logo} alt="logo" className="h-9 w-9 rounded-xl object-contain" />
+        ) : (
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-lift">
+            <Headphones className="h-5 w-5" />
+          </span>
+        )}
+        <span className="text-lg font-extrabold tracking-tight text-slate-800">{settings.brandName}</span>
       </Link>
 
       <nav className="flex-1 space-y-1 px-3 py-2">

@@ -1,6 +1,13 @@
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
+const Settings = require('../models/Settings');
 const { sendEmail, ticketCreatedEmail } = require('../utils/email');
+
+async function slaDueFrom(priority = 'medium', from = new Date()) {
+  const s = await Settings.get();
+  const hours = s.slaHours?.[priority] ?? 24;
+  return new Date(from.getTime() + hours * 3600 * 1000);
+}
 
 // Parse "Alice Smith <alice@x.com>" → { name, email }
 function parseFrom(raw = '') {
@@ -86,6 +93,7 @@ exports.inboundEmail = async (req, res) => {
   // Otherwise create a brand-new ticket.
   const ticket = await Ticket.create({
     subject: subject.replace(/^(re|fwd):\s*/i, '').trim() || '(no subject)',
+    slaDueAt: await slaDueFrom('medium'),
     requester: user._id,
     requesterEmail: email,
     requesterName: user.name,

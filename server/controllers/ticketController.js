@@ -1,11 +1,14 @@
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
+const Settings = require('../models/Settings');
 const {
   sendEmail,
   ticketCreatedEmail,
   ticketReplyEmail,
   ticketStatusEmail,
+  ticketAssignedEmail,
 } = require('../utils/email');
+const { sendWhatsApp } = require('../utils/notify');
 
 // Clients may only ever touch their own tickets.
 function scopeFor(user) {
@@ -14,7 +17,26 @@ function scopeFor(user) {
 }
 
 function isStaff(user) {
-  return user.role === 'admin' || user.role === 'agent';
+  return user.isStaff === true || User.STAFF_ROLES.includes(user.role);
+}
+
+// Compute the SLA due date from a priority using the configured hours.
+async function slaDueFrom(priority, from = new Date()) {
+  const s = await Settings.get();
+  const hours = s.slaHours?.[priority] ?? 24;
+  return new Date(from.getTime() + hours * 3600 * 1000);
+}
+
+// Fire-and-forget assignment alert (email + WhatsApp).
+function notifyAssignee(ticket, agent) {
+  if (!agent) return;
+  if (agent.email) sendEmail({ to: agent.email, ...ticketAssignedEmail(ticket, agent) });
+  sendWhatsApp(
+    agent,
+    `🎫 ${ticket.reference} assigned to you: "${ticket.subject}" (${ticket.priority}). ${
+      process.env.APP_URL || ''
+    }/tickets/${ticket._id}`
+  );
 }
 
 // Hide internal notes from clients.
@@ -95,10 +117,12 @@ exports.create = async (req, res) => {
     return res.status(400).json({ message: 'Subject and message are required' });
   }
 
+  const prio = Ticket.PRIORITIES.includes(priority) ? priority : 'medium';
   const ticket = await Ticket.create({
     subject,
-    priority: Ticket.PRIORITIES.includes(priority) ? priority : 'medium',
+    priority: prio,
     department: Ticket.DEPARTMENTS.includes(department) ? department : 'General',
+    slaDueAt: await slaDueFrom(prio),
     requester: req.user._id,
     requesterEmail: req.user.email,
     requesterName: req.user.name,
@@ -148,6 +172,8 @@ exports.reply = async (req, res) => {
     via: 'web',
   });
   ticket.lastReplyAt = new Date();
+  // Record first staff response for SLA.
+  if (!client && !ticket.firstResponseAt && !internal) ticket.firstResponseAt = new Date();
   // A client replying re-opens a resolved ticket.
   if (client && ticket.status === 'resolved') ticket.status = 'open';
   await ticket.save();
@@ -181,15 +207,23 @@ exports.update = async (req, res) => {
   const { status, priority, department, assignee, estimatedTime, dueDate, tags } = req.body;
   const changes = [];
   let statusChanged = false;
+  let newlyAssigned = null;
 
   if (status && Ticket.STATUSES.includes(status) && status !== ticket.status) {
     ticket.status = status;
     statusChanged = true;
     changes.push(`changed status to ${status.replace('_', ' ')}`);
+    if (status === 'resolved' || status === 'closed') {
+      if (!ticket.resolvedAt) ticket.resolvedAt = new Date();
+    } else {
+      ticket.resolvedAt = undefined; // reopened
+    }
   }
   if (priority && Ticket.PRIORITIES.includes(priority) && priority !== ticket.priority) {
     ticket.priority = priority;
     changes.push(`set priority to ${priority}`);
+    // Recompute the SLA target from creation time for the new priority.
+    if (!ticket.resolvedAt) ticket.slaDueAt = await slaDueFrom(priority, ticket.createdAt);
   }
   if (department && Ticket.DEPARTMENTS.includes(department) && department !== ticket.department) {
     ticket.department = department;
@@ -200,10 +234,12 @@ exports.update = async (req, res) => {
       ticket.assignee = undefined;
       changes.push('unassigned the ticket');
     } else {
-      const agent = await User.findById(assignee);
+      const agent = await User.findById(assignee).select('+whatsappApiKey');
       if (!agent) return res.status(400).json({ message: 'Assignee not found' });
+      const wasDifferent = String(ticket.assignee || '') !== String(agent._id);
       ticket.assignee = agent._id;
       changes.push(`assigned to ${agent.name}`);
+      if (wasDifferent) newlyAssigned = agent;
     }
   }
   if (estimatedTime !== undefined && estimatedTime !== ticket.estimatedTime) {
@@ -222,11 +258,50 @@ exports.update = async (req, res) => {
   if ((statusChanged || estimatedTime !== undefined) && ticket.requesterEmail) {
     sendEmail({ to: ticket.requesterEmail, ...ticketStatusEmail(ticket) });
   }
+  // Notify the newly assigned agent via email + WhatsApp.
+  if (newlyAssigned) notifyAssignee(ticket, newlyAssigned);
 
   const populated = await ticket
     .populate('assignee', 'name email avatarColor department')
     .then((t) => t.populate('requester', 'name email avatarColor'));
   res.json({ ticket: serialize(populated, req.user) });
+};
+
+// GET /api/tickets/export  — CSV of the (role-scoped, filtered) tickets. Staff only.
+exports.exportCsv = async (req, res) => {
+  const { status, priority, department, assignee } = req.query;
+  const filter = { ...scopeFor(req.user) };
+  if (status) filter.status = status;
+  if (priority) filter.priority = priority;
+  if (department) filter.department = department;
+  if (assignee) filter.assignee = assignee;
+
+  const tickets = await Ticket.find(filter)
+    .populate('assignee', 'name')
+    .sort('-createdAt')
+    .limit(5000)
+    .lean();
+
+  const cols = [
+    'reference', 'subject', 'status', 'priority', 'department',
+    'requesterName', 'requesterEmail', 'assignee', 'estimatedTime',
+    'slaDueAt', 'firstResponseAt', 'resolvedAt', 'source', 'createdAt', 'lastReplyAt',
+  ];
+  const esc = (v) => {
+    if (v === undefined || v === null) return '';
+    const s = v instanceof Date ? v.toISOString() : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rows = tickets.map((t) =>
+    cols
+      .map((c) => (c === 'assignee' ? esc(t.assignee?.name) : esc(t[c])))
+      .join(',')
+  );
+  const csv = [cols.join(','), ...rows].join('\n');
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="tickets-${Date.now()}.csv"`);
+  res.send(csv);
 };
 
 // DELETE /api/tickets/:id — admin only
@@ -242,5 +317,6 @@ exports.options = (req, res) => {
     statuses: Ticket.STATUSES,
     priorities: Ticket.PRIORITIES,
     departments: Ticket.DEPARTMENTS,
+    roles: User.ROLES,
   });
 };

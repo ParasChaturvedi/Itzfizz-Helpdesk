@@ -14,10 +14,13 @@ notes and client status updates — all yours, all free to run.
 | Area | What you get |
 | --- | --- |
 | **Email → Ticket** | Emails become tickets automatically via SendGrid Inbound Parse (webhook) or an optional IMAP poller. Replies thread back into the same ticket by its `TKT-000123` reference. |
-| **RBAC** | Three roles — **admin**, **agent**, **client** — enforced on every API route. Clients only ever see their own tickets; internal notes are hidden from them. |
-| **Assignment** | Assign any ticket to an agent, set department (Design / Development / Sales / Billing), priority, status and an estimated time. |
+| **RBAC & roles** | Roles: **admin**, **developer**, **designer**, **content_writer**, **hr**, **agent**, **client** — enforced on every API route. Admin provisions every account (sets a **username + password**); users can change their password later. Clients only see their own tickets; internal notes are hidden from them. |
+| **Assignment + notifications** | Assign any ticket to a team member; on assignment they get an **email + WhatsApp** alert. Set department, priority, status and estimated time. |
+| **SLA timers** | Each ticket gets a resolution deadline based on priority (configurable per priority in Settings). Tickets show **Due in Xh / Overdue / SLA met** badges. |
+| **CSV export** | One-click export of the current (filtered) ticket list to CSV. |
+| **Branding** | Admin uploads a **logo**, sets the brand name and accent colour from the Settings page (stored in the DB — no external file storage). |
 | **Client updates** | Auto-responder on new tickets + email notifications on replies and status changes. Clients track everything in their own portal. |
-| **Auth** | JWT (bearer + httpOnly cookie), bcrypt-hashed passwords, rate-limited login/register. The very first account to register becomes the admin. |
+| **Auth** | JWT (bearer + httpOnly cookie), bcrypt-hashed passwords, rate-limited login. Log in with **email or username**. The very first account to register becomes the admin. |
 | **Modern UI** | Clean, responsive Tailwind interface with dashboard stats, filters, search, conversation threads and an activity log. |
 
 ---
@@ -130,24 +133,49 @@ vercel --prod     # production
 
 ## 🔐 Roles at a glance
 
-| Capability | admin | agent | client |
+**Staff** = admin, developer, designer, content_writer, hr, agent. **Client** = end user.
+
+| Capability | admin | staff (dev/designer/writer/hr/agent) | client |
 | --- | :--: | :--: | :--: |
 | Create ticket / reply | ✅ | ✅ | ✅ |
 | See all tickets | ✅ | ✅ | own only |
 | Assign / change status / estimate | ✅ | ✅ | ❌ |
 | Internal notes | ✅ | ✅ | ❌ (hidden) |
-| Manage users & roles | ✅ | ❌ | ❌ |
+| Export CSV | ✅ | ✅ | ❌ |
+| Provision users / set roles | ✅ | ❌ | ❌ |
+| Branding & SLA settings | ✅ | ❌ | ❌ |
 | Delete tickets | ✅ | ❌ | ❌ |
+
+The admin creates accounts under **Team & Clients** (name, email, optional
+username, generated password, role, department, WhatsApp number). New users are
+flagged to change their password on first login.
+
+---
+
+## 📲 WhatsApp notifications (free options)
+
+Assignees get a WhatsApp alert when a ticket is assigned. Pick one:
+
+- **CallMeBot (fully free):** each teammate messages the CallMeBot number once to
+  get a personal API key, then saves the key + phone under **Profile**. No server
+  config needed. Guide: https://www.callmebot.com/blog/free-api-whatsapp-messages/
+- **Meta WhatsApp Cloud API:** set `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID` env vars
+  (free tier ~1,000 conversations/month). Sends to each user's saved phone.
+
+If neither is set, alerts are logged to the console — nothing breaks.
 
 ---
 
 ## 🧪 What's verified
 
-The full backend flow is covered end-to-end: admin bootstrap, RBAC enforcement,
-ticket creation with sequential references, assignment, status/estimate updates,
-internal-note visibility scoping, email-to-ticket creation + reply threading,
-stats and per-client scoping. The client builds cleanly and the login, dashboard
-and ticket views render against live data.
+Two end-to-end suites pass against an in-memory MongoDB (34 assertions total):
+admin bootstrap, full RBAC (incl. non-admin staff roles), username login,
+admin-provisioned accounts + forced password change, ticket references,
+assignment with email/WhatsApp alerts, SLA computation + recompute, resolvedAt,
+internal-note scoping, email-to-ticket + reply threading, CSV export, and
+branding/logo settings. The client builds cleanly and the login, dashboard,
+tickets (with SLA badges), settings and user-management screens render against
+live data.
 
 ---
 
