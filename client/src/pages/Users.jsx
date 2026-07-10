@@ -156,7 +156,7 @@ function AddModal({ onClose, onCreated }) {
     try {
       const { data } = await api.post('/users', form);
       onCreated(data.user);
-      toast.success('Member added — share the login details');
+      toast.success('Member added — login details emailed to them ✉️');
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add');

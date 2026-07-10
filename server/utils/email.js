@@ -211,6 +211,33 @@ function ticketAssignedClientEmail(ticket, agent, roleLabel) {
   };
 }
 
+// Sent to a user whose account was just provisioned by an admin.
+function accountCreatedEmail(user, password) {
+  const row = (k, v) =>
+    `<tr><td style="padding:6px 12px;color:#64748b">${k}</td><td style="padding:6px 12px;font-weight:600">${v}</td></tr>`;
+  return {
+    subject: 'Your Itzfizz Helpdesk account is ready',
+    html: shell(
+      'Welcome to Itzfizz Helpdesk',
+      `<p>Hi ${user.name},</p>
+       <p>An account has been created for you. You can sign in with your
+          <strong>email or username</strong> using the details below:</p>
+       <table style="border-collapse:collapse;margin:14px 0;background:#f8fafc;border-radius:8px">
+         ${row('Login link', `<a href="${appUrl()}/login">${appUrl()}/login</a>`)}
+         ${row('Email', user.email)}
+         ${user.username ? row('Username', user.username) : ''}
+         ${row('Temporary password', password)}
+         ${row('Role', user.role)}
+       </table>
+       <p style="color:#b1401d"><strong>Please change your password</strong> after your first
+          login — go to <em>Profile → New password</em>.</p>
+       <p style="margin-top:16px">
+         <a href="${appUrl()}/login" style="background:#d45427;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Log in now</a>
+       </p>`
+    ),
+  };
+}
+
 module.exports = {
   sendEmail,
   ticketCreatedEmail,
@@ -219,4 +246,5 @@ module.exports = {
   ticketAssignedEmail,
   ticketCreatedAdminEmail,
   ticketAssignedClientEmail,
+  accountCreatedEmail,
 };

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { sendEmail, accountCreatedEmail } = require('../utils/email');
 
 const ROLES = User.ROLES;
 const STAFF_ROLES = User.STAFF_ROLES;
@@ -50,7 +51,11 @@ exports.create = async (req, res) => {
     whatsappApiKey: whatsappApiKey || '',
     mustChangePassword: true, // admin-set password — prompt user to change it
   });
-  res.status(201).json({ user: user.toJSON() });
+
+  // Email the new user their login details (best-effort).
+  sendEmail({ to: user.email, ...accountCreatedEmail(user, password) });
+
+  res.status(201).json({ user: user.toJSON(), emailed: true });
 };
 
 // PATCH /api/users/:id — admin updates any field
