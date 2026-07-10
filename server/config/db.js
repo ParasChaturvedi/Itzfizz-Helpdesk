@@ -23,9 +23,20 @@ async function connectDB() {
         maxPoolSize: 5,
         serverSelectionTimeoutMS: 10000,
       })
-      .then((m) => m);
+      .then((m) => m)
+      .catch((err) => {
+        // Don't cache a failed connection — otherwise a transient error (e.g. an
+        // IP not yet whitelisted) would poison the cache until the lambda recycles.
+        cached.promise = null;
+        throw err;
+      });
   }
-  cached.conn = await cached.promise;
+  try {
+    cached.conn = await cached.promise;
+  } catch (err) {
+    cached.promise = null;
+    throw err;
+  }
   return cached.conn;
 }
 
