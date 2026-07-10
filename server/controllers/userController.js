@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { sendEmail, accountCreatedEmail } = require('../utils/email');
+const { background } = require('../utils/background');
 
 const ROLES = User.ROLES;
 const STAFF_ROLES = User.STAFF_ROLES;
@@ -52,8 +53,8 @@ exports.create = async (req, res) => {
     mustChangePassword: true, // admin-set password — prompt user to change it
   });
 
-  // Email the new user their login details (best-effort).
-  sendEmail({ to: user.email, ...accountCreatedEmail(user, password) });
+  // Email the new user their login details (kept alive on serverless).
+  background(sendEmail({ to: user.email, ...accountCreatedEmail(user, password) }));
 
   res.status(201).json({ user: user.toJSON(), emailed: true });
 };

@@ -11,6 +11,7 @@ const {
   ticketAssignedClientEmail,
 } = require('../utils/email');
 const { sendWhatsApp } = require('../utils/notify');
+const { background } = require('../utils/background');
 
 const APP = () => process.env.APP_URL || '';
 const ROLE_LABELS = {
@@ -54,54 +55,58 @@ async function slaDueFrom(priority, from = new Date()) {
   return new Date(from.getTime() + hours * 3600 * 1000);
 }
 
+// Each notify* returns a promise that settles only once every send finishes, so
+// background()/waitUntil can keep the serverless function alive until then.
+
 // Assignment alerts (email + WhatsApp) — to the agent AND back to the client.
 async function notifyAssignment(ticket, agent) {
   if (!agent) return;
-  // → assigned team member
-  if (agent.email) sendEmail({ to: agent.email, ...ticketAssignedEmail(ticket, agent) });
-  sendWhatsApp(
+  const jobs = [];
+  if (agent.email) jobs.push(sendEmail({ to: agent.email, ...ticketAssignedEmail(ticket, agent) }));
+  jobs.push(sendWhatsApp(
     agent,
     `🎫 Ticket ${ticket.reference} — ${ticket.requesterName || 'a client'} ne raise ki thi, admin ne aapko assign ki: "${ticket.subject}" (${ticket.priority}). ${APP()}/tickets/${ticket._id}`
-  );
-  // → client (needs their phone/key for WhatsApp; email always works)
+  ));
   if (ticket.requesterEmail) {
-    sendEmail({ to: ticket.requesterEmail, ...ticketAssignedClientEmail(ticket, agent, roleLabel(agent.role)) });
+    jobs.push(sendEmail({ to: ticket.requesterEmail, ...ticketAssignedClientEmail(ticket, agent, roleLabel(agent.role)) }));
   }
   const requester = ticket.requester
     ? await User.findById(ticket.requester).select('+whatsappApiKey')
     : null;
   if (requester) {
-    sendWhatsApp(
+    jobs.push(sendWhatsApp(
       requester,
       `👨‍💻 Aapki ticket ${ticket.reference} "${ticket.subject}" ab ${agent.name} (${roleLabel(agent.role)}) ko assign ho gayi — woh ispe kaam kar rahe hain. ${APP()}/tickets/${ticket._id}`
-    );
+    ));
   }
+  await Promise.allSettled(jobs);
 }
 
 // New-ticket alerts — confirmation to the client + heads-up to every admin.
 async function notifyNewTicket(ticket, requesterUser) {
-  // → client confirmation
-  if (ticket.requesterEmail) sendEmail({ to: ticket.requesterEmail, ...ticketCreatedEmail(ticket) });
+  const jobs = [];
+  if (ticket.requesterEmail) jobs.push(sendEmail({ to: ticket.requesterEmail, ...ticketCreatedEmail(ticket) }));
   if (requesterUser) {
-    sendWhatsApp(
+    jobs.push(sendWhatsApp(
       requesterUser,
       `✅ Aapki ticket ${ticket.reference} "${ticket.subject}" Itzfizz Helpdesk me submit ho gayi. Humari team jald ispe kaam karegi. ${APP()}/tickets/${ticket._id}`
-    );
+    ));
   }
-  // → all admins
   const admins = await User.find({ role: 'admin', active: true }).select('+whatsappApiKey');
   for (const a of admins) {
-    if (a.email) sendEmail({ to: a.email, ...ticketCreatedAdminEmail(ticket) });
-    sendWhatsApp(
+    if (a.email) jobs.push(sendEmail({ to: a.email, ...ticketCreatedAdminEmail(ticket) }));
+    jobs.push(sendWhatsApp(
       a,
       `🆕 Nayi ticket ${ticket.reference} — ${ticket.requesterName || ticket.requesterEmail} ne raise ki: "${ticket.subject}" (${ticket.priority}, ${ticket.department}). ${APP()}/tickets/${ticket._id}`
-    );
+    ));
   }
+  await Promise.allSettled(jobs);
 }
 
 // Status-change alert to the client (email + WhatsApp).
 async function notifyStatus(ticket) {
-  if (ticket.requesterEmail) sendEmail({ to: ticket.requesterEmail, ...ticketStatusEmail(ticket) });
+  const jobs = [];
+  if (ticket.requesterEmail) jobs.push(sendEmail({ to: ticket.requesterEmail, ...ticketStatusEmail(ticket) }));
   const requester = ticket.requester
     ? await User.findById(ticket.requester).select('+whatsappApiKey')
     : null;
@@ -110,8 +115,9 @@ async function notifyStatus(ticket) {
     const msg = done
       ? `🎉 Aapki ticket ${ticket.reference} "${ticket.subject}" ${statusLabel(ticket.status)} ho gayi hai. Dhanyavaad!`
       : `📣 Aapki ticket ${ticket.reference} ka status ab "${statusLabel(ticket.status)}" hai.${ticket.estimatedTime ? ` Estimated: ${ticket.estimatedTime}.` : ''}`;
-    sendWhatsApp(requester, `${msg} ${APP()}/tickets/${ticket._id}`);
+    jobs.push(sendWhatsApp(requester, `${msg} ${APP()}/tickets/${ticket._id}`));
   }
+  await Promise.allSettled(jobs);
 }
 
 // Hide internal notes from clients.
@@ -235,7 +241,7 @@ exports.create = async (req, res) => {
   });
 
   // Confirm to the client + alert every admin (email + WhatsApp).
-  notifyNewTicket(ticket, req.user);
+  background(notifyNewTicket(ticket, req.user));
 
   res.status(201).json({ ticket });
 };
@@ -275,20 +281,19 @@ exports.reply = async (req, res) => {
   if (client && ticket.status === 'resolved') ticket.status = 'open';
   await ticket.save();
 
-  // Notify the other party (skip internal notes).
+  // Notify the other party (skip internal notes). Kept alive on serverless.
   if (!internal) {
-    const message = { body };
+    const message = { body: body || '📎 sent an attachment' };
     if (client) {
-      // notify assignee (staff)
       if (ticket.assignee) {
-        const agent = await User.findById(ticket.assignee);
-        if (agent) sendEmail({ to: agent.email, ...ticketReplyEmail(ticket, message) });
+        background(
+          User.findById(ticket.assignee).then((agent) =>
+            agent ? sendEmail({ to: agent.email, ...ticketReplyEmail(ticket, message) }) : null
+          )
+        );
       }
-    } else {
-      // staff replied → notify the client
-      if (ticket.requesterEmail) {
-        sendEmail({ to: ticket.requesterEmail, ...ticketReplyEmail(ticket, message) });
-      }
+    } else if (ticket.requesterEmail) {
+      background(sendEmail({ to: ticket.requesterEmail, ...ticketReplyEmail(ticket, message) }));
     }
   }
 
@@ -406,9 +411,9 @@ exports.update = async (req, res) => {
   await ticket.save();
 
   // Notify the client on status changes / new estimates (email + WhatsApp).
-  if (statusChanged || estimatedTime !== undefined) notifyStatus(ticket);
+  if (statusChanged || estimatedTime !== undefined) background(notifyStatus(ticket));
   // Notify the newly assigned team member AND the client (email + WhatsApp).
-  if (newlyAssigned) notifyAssignment(ticket, newlyAssigned);
+  if (newlyAssigned) background(notifyAssignment(ticket, newlyAssigned));
 
   const populated = await ticket.populate(RECEIPT_POP);
   res.json({ ticket: serialize(populated, req.user) });

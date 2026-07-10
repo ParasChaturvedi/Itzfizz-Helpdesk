@@ -3,17 +3,20 @@ const User = require('../models/User');
 const Settings = require('../models/Settings');
 const { sendEmail, ticketCreatedEmail, ticketCreatedAdminEmail } = require('../utils/email');
 const { sendWhatsApp } = require('../utils/notify');
+const { background } = require('../utils/background');
 
 // Alert every admin about a new (email-sourced) ticket.
 async function alertAdmins(ticket) {
   const admins = await User.find({ role: 'admin', active: true }).select('+whatsappApiKey');
+  const jobs = [];
   for (const a of admins) {
-    if (a.email) sendEmail({ to: a.email, ...ticketCreatedAdminEmail(ticket) });
-    sendWhatsApp(
+    if (a.email) jobs.push(sendEmail({ to: a.email, ...ticketCreatedAdminEmail(ticket) }));
+    jobs.push(sendWhatsApp(
       a,
       `🆕 Nayi ticket ${ticket.reference} — ${ticket.requesterName || ticket.requesterEmail} ne email se raise ki: "${ticket.subject}". ${process.env.APP_URL || ''}/tickets/${ticket._id}`
-    );
+    ));
   }
+  await Promise.allSettled(jobs);
 }
 
 async function slaDueFrom(priority = 'medium', from = new Date()) {
@@ -124,7 +127,9 @@ exports.inboundEmail = async (req, res) => {
     activity: [{ actorName: user.name, action: 'created the ticket via email' }],
   });
 
-  sendEmail({ to: email, ...ticketCreatedEmail(ticket) });
-  alertAdmins(ticket);
+  background(Promise.allSettled([
+    sendEmail({ to: email, ...ticketCreatedEmail(ticket) }),
+    alertAdmins(ticket),
+  ]));
   res.json({ ok: true, ticket: ticket.reference, action: 'created' });
 };

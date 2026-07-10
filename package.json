@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.4",
+    "@vercel/functions": "^1.5.2",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
