@@ -22,15 +22,51 @@ function getSmtp() {
 
 const FROM = process.env.EMAIL_FROM || 'Itzfizz Helpdesk Support <no-reply@itzfizz.local>';
 
+// Parse `"Name <email@x.com>"` → { name, email }
+function parseFrom(raw = '') {
+  const m = raw.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1].trim(), email: m[2].trim() };
+  return { name: '', email: raw.trim() };
+}
+
+// Brevo (Sendinblue) transactional API — free 300 emails/day.
+async function sendViaBrevo({ to, subject, html, text, replyTo }) {
+  const sender = parseFrom(FROM);
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { email: sender.email, name: sender.name || undefined },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text || stripHtml(html),
+      ...(replyTo ? { replyTo: { email: replyTo } } : {}),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Brevo ${res.status}: ${body.slice(0, 200)}`);
+  }
+}
+
 /**
- * Send an email. Uses SendGrid if configured, otherwise SMTP, otherwise logs
- * to the console (dev-friendly, never throws so ticket flow is not blocked).
+ * Send an email. Provider preference: Brevo → SendGrid → SMTP → console log.
+ * Never throws, so the ticket flow is never blocked by email problems.
  */
 async function sendEmail({ to, subject, html, text, replyTo }) {
   const payload = { to, from: FROM, subject, html, text: text || stripHtml(html) };
   if (replyTo) payload.replyTo = replyTo;
 
   try {
+    if (process.env.BREVO_API_KEY) {
+      await sendViaBrevo({ to, subject, html, text, replyTo });
+      return { ok: true, provider: 'brevo' };
+    }
     if (sgReady) {
       await sgMail.send(payload);
       return { ok: true, provider: 'sendgrid' };
