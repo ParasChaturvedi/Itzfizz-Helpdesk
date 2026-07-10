@@ -12,7 +12,7 @@ const Ticket = require('../models/Ticket');
 async function run() {
   await connectDB();
 
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@deskflow.local').toLowerCase();
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@itzfizz.local').toLowerCase();
   const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
 
   let admin = await User.findOne({ email: adminEmail });
@@ -36,15 +36,15 @@ async function run() {
   };
 
   const designer = await upsert({
-    name: 'Priya (Design)', email: 'design@deskflow.local',
+    name: 'Priya (Design)', email: 'design@itzfizz.local',
     password: 'agent123', role: 'agent', department: 'Design',
   });
   const dev = await upsert({
-    name: 'Rahul (Dev)', email: 'dev@deskflow.local',
+    name: 'Rahul (Dev)', email: 'dev@itzfizz.local',
     password: 'agent123', role: 'agent', department: 'Development',
   });
   const client = await upsert({
-    name: 'Sample Client', email: 'client@deskflow.local',
+    name: 'Sample Client', email: 'client@itzfizz.local',
     password: 'client123', role: 'client',
   });
 
@@ -71,9 +71,9 @@ async function run() {
 
   console.log('\nDemo logins:');
   console.log(`  admin  → ${adminEmail} / ${adminPass}`);
-  console.log('  agent  → design@deskflow.local / agent123');
-  console.log('  agent  → dev@deskflow.local / agent123');
-  console.log('  client → client@deskflow.local / client123');
+  console.log('  agent  → design@itzfizz.local / agent123');
+  console.log('  agent  → dev@itzfizz.local / agent123');
+  console.log('  client → client@itzfizz.local / client123');
 
   await mongoose.connection.close();
   process.exit(0);

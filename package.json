@@ -1,8 +1,8 @@
 {
-  "name": "deskflow",
+  "name": "itzfizz-helpdesk",
   "version": "1.0.0",
   "private": true,
-  "description": "DeskFlow — a modern self-hosted MERN helpdesk / ticketing system with email-to-ticket, RBAC and task assignment.",
+  "description": "Itzfizz Helpdesk — a modern self-hosted MERN helpdesk / ticketing system with email-to-ticket, RBAC and task assignment.",
   "type": "commonjs",
   "engines": {
     "node": ">=18"

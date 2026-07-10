@@ -65,7 +65,7 @@ async function processMailbox() {
 
 async function loop() {
   await connectDB();
-  console.log(`📥 DeskFlow IMAP worker started (every ${POLL / 1000}s)`);
+  console.log(`📥 Itzfizz Helpdesk IMAP worker started (every ${POLL / 1000}s)`);
   const tick = async () => {
     try {
       await processMailbox();

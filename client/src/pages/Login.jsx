@@ -27,7 +27,7 @@ export default function Login() {
 
   return (
     <AuthShell>
-      <h1 className="text-2xl font-extrabold text-slate-800">Sign in to DeskFlow</h1>
+      <h1 className="text-2xl font-extrabold text-slate-800">Sign in to Itzfizz Helpdesk</h1>
       <p className="mt-1 text-sm text-slate-400">Manage every request in one calm place.</p>
 
       <form onSubmit={submit} className="mt-7 space-y-4">
@@ -60,7 +60,7 @@ export function AuthShell({ children }) {
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
               <Headphones className="h-5 w-5" />
             </span>
-            <span className="text-xl font-extrabold">DeskFlow</span>
+            <span className="text-xl font-extrabold">Itzfizz Helpdesk</span>
           </div>
           <div>
             <h2 className="max-w-sm text-3xl font-bold leading-snug">
@@ -76,7 +76,7 @@ export function AuthShell({ children }) {
               <span>✓ Assignments</span>
             </div>
           </div>
-          <span className="text-sm text-white/50">© {new Date().getFullYear()} DeskFlow</span>
+          <span className="text-sm text-white/50">© {new Date().getFullYear()} Itzfizz Helpdesk</span>
         </div>
       </div>
 

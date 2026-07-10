@@ -19,7 +19,7 @@ function SidebarContent({ user, onNavigate }) {
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-lift">
           <Headphones className="h-5 w-5" />
         </span>
-        <span className="text-lg font-extrabold tracking-tight text-slate-800">DeskFlow</span>
+        <span className="text-lg font-extrabold tracking-tight text-slate-800">Itzfizz Helpdesk</span>
       </Link>
 
       <nav className="flex-1 space-y-1 px-3 py-2">

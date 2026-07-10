@@ -5,9 +5,9 @@ const mongoose = require('mongoose');
  * On platforms like Vercel each request may run in a fresh lambda, so we cache
  * the connection on the global object to avoid opening a new pool every time.
  */
-let cached = global.__deskflowMongoose;
+let cached = global.__itzfizzMongoose;
 if (!cached) {
-  cached = global.__deskflowMongoose = { conn: null, promise: null };
+  cached = global.__itzfizzMongoose = { conn: null, promise: null };
 }
 
 async function connectDB() {

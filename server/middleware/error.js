@@ -4,7 +4,7 @@ function notFound(req, res, next) {
 
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
-  console.error('[DeskFlow error]', err.message);
+  console.error('[Itzfizz Helpdesk error]', err.message);
   let status = err.statusCode || 500;
   let message = err.message || 'Server error';
 

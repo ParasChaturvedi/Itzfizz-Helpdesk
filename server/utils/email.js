@@ -20,7 +20,7 @@ function getSmtp() {
   return smtpTransport;
 }
 
-const FROM = process.env.EMAIL_FROM || 'DeskFlow Support <no-reply@deskflow.local>';
+const FROM = process.env.EMAIL_FROM || 'Itzfizz Helpdesk Support <no-reply@itzfizz.local>';
 
 /**
  * Send an email. Uses SendGrid if configured, otherwise SMTP, otherwise logs
@@ -58,14 +58,14 @@ const appUrl = () => process.env.APP_URL || 'http://localhost:5173';
 function shell(title, body) {
   return `<div style="font-family:Inter,Segoe UI,Arial,sans-serif;max-width:560px;margin:auto;color:#1e293b">
     <div style="padding:24px 0;border-bottom:2px solid #6366f1">
-      <span style="font-size:20px;font-weight:700;color:#4f46e5">DeskFlow</span>
+      <span style="font-size:20px;font-weight:700;color:#4f46e5">Itzfizz Helpdesk</span>
     </div>
     <div style="padding:24px 0">
       <h2 style="margin:0 0 12px;font-size:18px">${title}</h2>
       ${body}
     </div>
     <div style="padding:16px 0;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8">
-      This is an automated message from DeskFlow.
+      This is an automated message from Itzfizz Helpdesk.
     </div>
   </div>`;
 }

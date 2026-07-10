@@ -1,4 +1,4 @@
-# 🎧 DeskFlow
+# 🎧 Itzfizz Helpdesk
 
 A modern, self-hosted **helpdesk / ticketing system** built on the **MERN** stack.
 Email-to-Ticket automation, Role-Based Access Control, task assignment, internal
@@ -25,7 +25,7 @@ notes and client status updates — all yours, all free to run.
 ## 🧱 Architecture
 
 ```
-deskflow/
+itzfizz-helpdesk/
 ├── api/index.js         # Vercel serverless entry → wraps the Express app
 ├── server/              # Express + Mongoose API
 │   ├── app.js           # app (no listen) — imported by api + local index
@@ -59,7 +59,7 @@ npm install --prefix client
 cp .env.example .env       # fill in MONGODB_URI + JWT_SECRET (min needed)
 
 # 3. seed an admin + demo data (optional)
-npm run seed               # → admin@deskflow.local / admin123
+npm run seed               # → admin@itzfizz.local / admin123
 
 # 4. run API + client together
 npm run dev

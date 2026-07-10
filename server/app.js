@@ -25,7 +25,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-app.get('/api/health', (req, res) => res.json({ ok: true, service: 'deskflow', time: Date.now() }));
+app.get('/api/health', (req, res) => res.json({ ok: true, service: 'itzfizz-helpdesk', time: Date.now() }));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));

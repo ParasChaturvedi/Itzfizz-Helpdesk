@@ -6,27 +6,27 @@ export const useAuth = create((set, get) => ({
   loading: true,
 
   async bootstrap() {
-    const token = localStorage.getItem('deskflow_token');
+    const token = localStorage.getItem('itzfizz_token');
     if (!token) return set({ loading: false });
     try {
       const { data } = await api.get('/auth/me');
       set({ user: data.user, loading: false });
     } catch {
-      localStorage.removeItem('deskflow_token');
+      localStorage.removeItem('itzfizz_token');
       set({ user: null, loading: false });
     }
   },
 
   async login(email, password) {
     const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('deskflow_token', data.token);
+    localStorage.setItem('itzfizz_token', data.token);
     set({ user: data.user });
     return data.user;
   },
 
   async register(name, email, password) {
     const { data } = await api.post('/auth/register', { name, email, password });
-    localStorage.setItem('deskflow_token', data.token);
+    localStorage.setItem('itzfizz_token', data.token);
     set({ user: data.user });
     return data.user;
   },
@@ -37,7 +37,7 @@ export const useAuth = create((set, get) => ({
     } catch {
       /* ignore */
     }
-    localStorage.removeItem('deskflow_token');
+    localStorage.removeItem('itzfizz_token');
     set({ user: null });
   },
 
