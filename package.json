@@ -1,0 +1,40 @@
+{
+  "name": "deskflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DeskFlow — a modern self-hosted MERN helpdesk / ticketing system with email-to-ticket, RBAC and task assignment.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev:server": "nodemon server/index.js",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev:server\" \"npm run dev:client\"",
+    "start": "node server/index.js",
+    "seed": "node server/scripts/seed.js",
+    "imap": "node server/scripts/imapWorker.js",
+    "build:client": "npm install --prefix client && npm run build --prefix client",
+    "vercel-build": "npm run build:client"
+  },
+  "dependencies": {
+    "@sendgrid/mail": "^8.1.4",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.1",
+    "nodemailer": "^6.9.16"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "imapflow": "^1.0.171",
+    "mailparser": "^3.7.1",
+    "nodemon": "^3.1.9"
+  }
+}
