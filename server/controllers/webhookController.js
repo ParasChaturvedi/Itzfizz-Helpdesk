@@ -57,8 +57,9 @@ function cleanBody(text = '') {
  * source that posts { from, subject, text } as form fields or JSON.
  */
 exports.inboundEmail = async (req, res) => {
+  // Fail closed — the endpoint is public, so a missing token must reject too.
   if (
-    process.env.INBOUND_WEBHOOK_TOKEN &&
+    !process.env.INBOUND_WEBHOOK_TOKEN ||
     req.query.token !== process.env.INBOUND_WEBHOOK_TOKEN
   ) {
     return res.status(401).json({ message: 'Invalid webhook token' });
@@ -83,11 +84,17 @@ exports.inboundEmail = async (req, res) => {
     });
   }
 
-  // Reply to an existing ticket?
+  // Reply to an existing ticket — only if this sender actually owns it,
+  // otherwise fall through and open a fresh ticket (don't let anyone inject
+  // into another client's ticket by guessing a TKT-###### reference).
   const ref = findReference(subject);
   if (ref) {
     const existing = await Ticket.findOne({ reference: ref });
-    if (existing) {
+    const owns =
+      existing &&
+      (String(existing.requester) === String(user._id) ||
+        (existing.requesterEmail || '').toLowerCase() === email);
+    if (owns) {
       existing.messages.push({
         author: user._id,
         authorName: user.name,

@@ -218,10 +218,14 @@ exports.create = async (req, res) => {
   }
 
   const prio = Ticket.PRIORITIES.includes(priority) ? priority : 'medium';
+  // Clients don't choose the department — the admin triages and routes it.
+  // Only staff/admin may set a department at creation time.
+  const dept =
+    isStaff(req.user) && Ticket.DEPARTMENTS.includes(department) ? department : 'General';
   const ticket = await Ticket.create({
     subject,
     priority: prio,
-    department: Ticket.DEPARTMENTS.includes(department) ? department : 'General',
+    department: dept,
     slaDueAt: await slaDueFrom(prio),
     requester: req.user._id,
     requesterEmail: req.user.email,

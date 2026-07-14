@@ -274,17 +274,46 @@ export default function TicketDetail() {
                   <Row icon={Building2} label="Department"><span className="text-sm text-slate-700">{ticket.department}</span></Row>
                 )}
 
-                {admin ? (
-                  <Control icon={UserCog} label="Assignee">
-                    <select className="input" value={ticket.assignee?._id || ''}
-                      onChange={(e) => patch({ assignee: e.target.value || null }, 'Assignment updated')}>
-                      <option value="">Unassigned</option>
-                      {agents.map((a) => (
-                        <option key={a._id} value={a._id}>{a.name}{a.department ? ` · ${a.department}` : ''}</option>
-                      ))}
-                    </select>
-                  </Control>
-                ) : (
+                {admin ? (() => {
+                  // A brand-new ticket sits in 'General' until the admin routes it —
+                  // don't group/warn by department until a real one is chosen.
+                  const untriaged = ticket.department === 'General';
+                  const inDept = untriaged ? [] : agents.filter((a) => a.department === ticket.department);
+                  const others = untriaged ? agents : agents.filter((a) => a.department !== ticket.department);
+                  const assigneeInList = ticket.assignee && agents.some((a) => a._id === ticket.assignee._id);
+                  return (
+                    <Control icon={UserCog} label={untriaged ? 'Assignee' : `Assignee — ${ticket.department} team`}>
+                      <select className="input" value={ticket.assignee?._id || ''}
+                        onChange={(e) => patch({ assignee: e.target.value || null }, 'Assignment updated')}>
+                        <option value="">Unassigned</option>
+                        {ticket.assignee && !assigneeInList && (
+                          <option value={ticket.assignee._id}>{ticket.assignee.name} (inactive)</option>
+                        )}
+                        {inDept.length > 0 && (
+                          <optgroup label={`${ticket.department} team`}>
+                            {inDept.map((a) => <option key={a._id} value={a._id}>{a.name}</option>)}
+                          </optgroup>
+                        )}
+                        {others.length > 0 && (
+                          <optgroup label={untriaged ? 'All team members' : 'Other departments'}>
+                            {others.map((a) => (
+                              <option key={a._id} value={a._id}>{a.name}{a.department ? ` · ${a.department}` : ''}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                      {untriaged ? (
+                        <p className="mt-1 text-xs text-slate-400">
+                          Set a department above first, then pick the right person from that team.
+                        </p>
+                      ) : inDept.length === 0 ? (
+                        <p className="mt-1 text-xs text-amber-600">
+                          No employees in {ticket.department} yet — add them under Team &amp; Clients.
+                        </p>
+                      ) : null}
+                    </Control>
+                  );
+                })() : (
                   <Row icon={UserCog} label="Assigned to">
                     <span className="text-sm text-slate-700">{ticket.assignee?.name || 'You'}</span>
                   </Row>

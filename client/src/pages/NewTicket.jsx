@@ -7,7 +7,8 @@ import { useAuth } from '../store/auth';
 
 export default function NewTicket() {
   const navigate = useNavigate();
-  const { isStaff } = useAuth();
+  const { user, isStaff } = useAuth();
+  const client = user.role === 'client';
   const [options, setOptions] = useState({ priorities: [], departments: [] });
   const [form, setForm] = useState({ subject: '', body: '', priority: 'medium', department: 'General' });
   const [busy, setBusy] = useState(false);
@@ -55,20 +56,27 @@ export default function NewTicket() {
             value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={client ? '' : 'grid gap-4 sm:grid-cols-2'}>
           <div>
             <label className="label">Priority</label>
             <select className="input" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
               {options.priorities.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-          <div>
-            <label className="label">Department</label>
-            <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
-              {options.departments.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
+          {!client && (
+            <div>
+              <label className="label">Department</label>
+              <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
+                {options.departments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          )}
         </div>
+        {client && (
+          <p className="-mt-2 text-xs text-slate-400">
+            Just describe your request — our team will route it to the right department and assign the best person.
+          </p>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Link to="/tickets" className="btn-ghost">Cancel</Link>
