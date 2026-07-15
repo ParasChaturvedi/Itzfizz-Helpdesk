@@ -33,6 +33,9 @@ app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/attachments', require('./routes/attachments'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/webhooks', require('./routes/webhooks'));
+app.use('/api/tags', require('./routes/tags'));
+app.use('/api/macros', require('./routes/macros'));
+app.use('/api/sla', require('./routes/sla'));
 
 app.use(notFound);
 app.use(errorHandler);

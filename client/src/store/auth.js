@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import api from '../api/axios';
 
+// Everyone who can handle tickets — mirrors User.STAFF_ROLES on the backend.
+export const STAFF_ROLES = ['admin', 'developer', 'designer', 'content_writer', 'hr', 'agent'];
+
 export const useAuth = create((set, get) => ({
   user: null,
   loading: true,
@@ -42,6 +45,6 @@ export const useAuth = create((set, get) => ({
   },
 
   setUser: (user) => set({ user }),
-  isStaff: () => ['admin', 'agent'].includes(get().user?.role),
+  isStaff: () => STAFF_ROLES.includes(get().user?.role),
   isAdmin: () => get().user?.role === 'admin',
 }));

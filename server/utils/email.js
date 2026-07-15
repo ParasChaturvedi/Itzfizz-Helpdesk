@@ -238,6 +238,26 @@ function accountCreatedEmail(user, password) {
   };
 }
 
+// SLA breach / escalation alert to staff — metadata only, never ticket content.
+function slaBreachEmail(ticket, label) {
+  return {
+    subject: `[${ticket.reference}] ${label}`,
+    html: shell(
+      label,
+      `<p>Ticket <strong>${ticket.reference}</strong> needs attention.</p>
+       <table style="border-collapse:collapse;margin:14px 0;background:#f8fafc;border-radius:8px">
+         <tr><td style="padding:6px 12px;color:#64748b">Subject</td><td style="padding:6px 12px;font-weight:600">${ticket.subject}</td></tr>
+         <tr><td style="padding:6px 12px;color:#64748b">Priority</td><td style="padding:6px 12px;font-weight:600">${ticket.priority}</td></tr>
+         <tr><td style="padding:6px 12px;color:#64748b">Department</td><td style="padding:6px 12px;font-weight:600">${ticket.department}</td></tr>
+         <tr><td style="padding:6px 12px;color:#64748b">Escalation level</td><td style="padding:6px 12px;font-weight:600">${ticket.escalationLevel || 0}</td></tr>
+       </table>
+       <p style="margin-top:16px">
+         <a href="${appUrl()}/tickets/${ticket._id}" style="background:#d45427;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open ticket</a>
+       </p>`
+    ),
+  };
+}
+
 module.exports = {
   sendEmail,
   ticketCreatedEmail,
@@ -247,4 +267,5 @@ module.exports = {
   ticketCreatedAdminEmail,
   ticketAssignedClientEmail,
   accountCreatedEmail,
+  slaBreachEmail,
 };

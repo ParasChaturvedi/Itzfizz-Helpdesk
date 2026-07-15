@@ -1,5 +1,53 @@
 import { STATUS_META, PRIORITY_META, ROLE_META, initials, slaState } from '../lib/ui';
-import { Loader2, Inbox, Timer } from 'lucide-react';
+import { Loader2, Inbox, Timer, Star, X } from 'lucide-react';
+
+// Convert a hex colour to a soft translucent background for tag chips.
+function tint(hex) {
+  const h = (hex || '#64748b').replace('#', '');
+  const n = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(n.slice(0, 2), 16) || 100;
+  const g = parseInt(n.slice(2, 4), 16) || 116;
+  const b = parseInt(n.slice(4, 6), 16) || 139;
+  return { color: `rgb(${r},${g},${b})`, background: `rgba(${r},${g},${b},0.12)` };
+}
+
+export function TagChip({ name, color, onRemove }) {
+  const s = tint(color);
+  return (
+    <span className="chip" style={s}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />
+      {name}
+      {onRemove && (
+        <button type="button" onClick={onRemove} className="ml-0.5 opacity-60 hover:opacity-100" aria-label={`Remove ${name}`}>
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </span>
+  );
+}
+
+export function Stars({ value = 0, onChange, size = 20 }) {
+  const readOnly = !onChange;
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={readOnly}
+          onClick={() => onChange && onChange(n)}
+          className={readOnly ? 'cursor-default' : 'cursor-pointer transition hover:scale-110'}
+          aria-label={`${n} star${n > 1 ? 's' : ''}`}
+        >
+          <Star
+            style={{ width: size, height: size }}
+            className={n <= value ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function Avatar({ name = '?', color = '#6366f1', size = 36 }) {
   return (

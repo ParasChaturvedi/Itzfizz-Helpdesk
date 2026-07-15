@@ -4,7 +4,7 @@ import { Search, Plus, Filter, Ticket as TicketIcon, Download } from 'lucide-rea
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../store/auth';
-import { Spinner, StatusBadge, PriorityBadge, SlaBadge, Avatar, EmptyState } from '../components/ui';
+import { Spinner, StatusBadge, PriorityBadge, SlaBadge, Avatar, EmptyState, TagChip } from '../components/ui';
 import { timeAgo, STATUS_META } from '../lib/ui';
 
 const STATUS_TABS = ['all', 'open', 'in_progress', 'on_hold', 'resolved', 'closed'];
@@ -17,12 +17,19 @@ export default function Tickets() {
   const [q, setQ] = useState('');
   const [priority, setPriority] = useState('');
   const [mine, setMine] = useState(false);
+  const [tag, setTag] = useState('');
+  const [allTags, setAllTags] = useState([]);
+
+  useEffect(() => {
+    api.get('/tags').then((r) => setAllTags(r.data.tags)).catch(() => {});
+  }, []);
 
   const load = () => {
     setLoading(true);
     const params = {};
     if (tab !== 'all') params.status = tab;
     if (priority) params.priority = priority;
+    if (tag) params.tag = tag;
     if (mine) params.mine = 'true';
     if (q) params.q = q;
     api.get('/tickets', { params })
@@ -34,7 +41,9 @@ export default function Tickets() {
     const id = setTimeout(load, q ? 300 : 0);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, priority, mine, q]);
+  }, [tab, priority, mine, q, tag]);
+
+  const tagColor = (name) => allTags.find((t) => t.name === name)?.color;
 
   const counts = useMemo(() => tickets.length, [tickets]);
 
@@ -93,6 +102,12 @@ export default function Tickets() {
               <option value="low">Low</option>
             </select>
           </div>
+          {allTags.length > 0 && (
+            <select className="input !w-auto" value={tag} onChange={(e) => setTag(e.target.value)}>
+              <option value="">All tags</option>
+              {allTags.map((t) => <option key={t._id} value={t.name}>#{t.name}</option>)}
+            </select>
+          )}
           {isStaff() && (
             <button
               onClick={() => setMine((m) => !m)}
@@ -144,6 +159,12 @@ export default function Tickets() {
                 <div className="text-xs text-slate-400">
                   {t.requester?.name || t.requesterName} · updated {timeAgo(t.lastReplyAt)}
                 </div>
+                {(t.tags || []).length > 0 && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {t.tags.slice(0, 3).map((name) => <TagChip key={name} name={name} color={tagColor(name)} />)}
+                    {t.tags.length > 3 && <span className="text-xs text-slate-400">+{t.tags.length - 3}</span>}
+                  </div>
+                )}
               </div>
               <div className="hidden shrink-0 items-center gap-2 md:flex">
                 <SlaBadge ticket={t} />

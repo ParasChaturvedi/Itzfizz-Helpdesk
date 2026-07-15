@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './store/auth';
+import { useAuth, STAFF_ROLES } from './store/auth';
 import { useSettings } from './store/settings';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
 import TicketDetail from './pages/TicketDetail';
 import NewTicket from './pages/NewTicket';
+import Macros from './pages/Macros';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
 import SettingsPage from './pages/Settings';
@@ -44,6 +45,14 @@ export default function App() {
         <Route path="/tickets" element={<Tickets />} />
         <Route path="/tickets/new" element={<NewTicket />} />
         <Route path="/tickets/:id" element={<TicketDetail />} />
+        <Route
+          path="/macros"
+          element={
+            <ProtectedRoute roles={STAFF_ROLES}>
+              <Macros />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/users"
           element={

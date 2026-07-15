@@ -76,6 +76,20 @@ const ticketSchema = new mongoose.Schema(
     firstResponseAt: { type: Date }, // first staff reply
     resolvedAt: { type: Date }, // when moved to resolved/closed
 
+    // First-response SLA + auto-escalation (managed by the SLA engine).
+    firstResponseDueAt: { type: Date },
+    firstResponseBreached: { type: Boolean, default: false },
+    escalationLevel: { type: Number, default: 0 },
+    slaBreachedAt: { type: Date }, // resolution breach — set once, prevents re-escalation
+    slaWarned: { type: Boolean, default: false }, // approaching-breach warning sent
+
+    // Customer satisfaction rating — the client rates once the ticket is resolved.
+    csat: {
+      rating: { type: Number, min: 1, max: 5 },
+      comment: { type: String, default: '' },
+      submittedAt: { type: Date },
+    },
+
     source: { type: String, enum: ['web', 'email'], default: 'web' },
     messages: [messageSchema],
     activity: [activitySchema],

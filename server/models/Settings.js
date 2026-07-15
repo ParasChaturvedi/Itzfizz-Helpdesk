@@ -16,6 +16,18 @@ const settingsSchema = new mongoose.Schema(
       medium: { type: Number, default: 24 },
       low: { type: Number, default: 72 },
     },
+    // First-response SLA in hours, per priority.
+    slaFirstResponseHours: {
+      urgent: { type: Number, default: 1 },
+      high: { type: Number, default: 2 },
+      medium: { type: Number, default: 8 },
+      low: { type: Number, default: 24 },
+    },
+    // Auto-escalation on SLA breach.
+    slaEscalation: {
+      enabled: { type: Boolean, default: true },
+      bumpPriority: { type: Boolean, default: true },
+    },
   },
   { timestamps: true, _id: false }
 );

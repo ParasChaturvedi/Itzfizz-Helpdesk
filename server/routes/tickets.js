@@ -16,6 +16,7 @@ router.post('/', ctrl.create);
 router.get('/:id', ctrl.get);
 router.post('/:id/reply', ctrl.reply);
 router.post('/:id/read', ctrl.markRead);
+router.post('/:id/csat', ctrl.submitCsat);
 router.post('/:id/attachments', upload.array('files', 6), ctrl.uploadAttachments);
 
 // Only staff can change ticket fields / assignment.

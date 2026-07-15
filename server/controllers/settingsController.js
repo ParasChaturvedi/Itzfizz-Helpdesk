@@ -25,6 +25,18 @@ exports.update = async (req, res) => {
       if (typeof slaHours[key] === 'number' && slaHours[key] > 0) s.slaHours[key] = slaHours[key];
     }
   }
+  const { slaFirstResponseHours, slaEscalation } = req.body;
+  if (slaFirstResponseHours && typeof slaFirstResponseHours === 'object') {
+    for (const key of ['urgent', 'high', 'medium', 'low']) {
+      if (typeof slaFirstResponseHours[key] === 'number' && slaFirstResponseHours[key] > 0) {
+        s.slaFirstResponseHours[key] = slaFirstResponseHours[key];
+      }
+    }
+  }
+  if (slaEscalation && typeof slaEscalation === 'object') {
+    if (typeof slaEscalation.enabled === 'boolean') s.slaEscalation.enabled = slaEscalation.enabled;
+    if (typeof slaEscalation.bumpPriority === 'boolean') s.slaEscalation.bumpPriority = slaEscalation.bumpPriority;
+  }
   await s.save();
   res.json({ settings: s });
 };

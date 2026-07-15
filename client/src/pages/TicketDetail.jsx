@@ -3,11 +3,12 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Send, Lock, Clock, Building2, UserCog, Flag, Activity, Trash2, Mail,
   CheckCircle2, RotateCcw, Paperclip, Check, CheckCheck, FileText,
+  MessageSquareText, Tag as TagIcon, Plus, AlertTriangle, Star,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../store/auth';
-import { Spinner, StatusBadge, PriorityBadge, SlaBadge, Avatar } from '../components/ui';
+import { Spinner, StatusBadge, PriorityBadge, SlaBadge, Avatar, TagChip, Stars } from '../components/ui';
 import { timeAgo, fullDate } from '../lib/ui';
 
 export default function TicketDetail() {
@@ -24,6 +25,11 @@ export default function TicketDetail() {
   const [sending, setSending] = useState(false);
   const [pending, setPending] = useState([]); // uploaded-but-not-yet-sent attachments
   const [uploading, setUploading] = useState(false);
+  const [macros, setMacros] = useState([]);
+  const [showMacros, setShowMacros] = useState(false);
+  const [allTags, setAllTags] = useState([]);
+  const [showTagMenu, setShowTagMenu] = useState(false);
+  const [csat, setCsat] = useState({ rating: 0, comment: '', busy: false });
   const threadEnd = useRef(null);
   const fileRef = useRef(null);
 
@@ -38,6 +44,10 @@ export default function TicketDetail() {
     setLoading(true);
     const calls = [load().then(markRead), api.get('/tickets/meta/options').then((r) => setOptions(r.data))];
     if (admin) calls.push(api.get('/users/agents').then((r) => setAgents(r.data.agents)));
+    if (isStaff()) {
+      calls.push(api.get('/macros').then((r) => setMacros(r.data.macros)).catch(() => {}));
+      calls.push(api.get('/tags').then((r) => setAllTags(r.data.tags)).catch(() => {}));
+    }
     Promise.all(calls)
       .catch((e) => toast.error(e.response?.data?.message || 'Failed to load ticket'))
       .finally(() => setLoading(false));
@@ -111,6 +121,55 @@ export default function TicketDetail() {
     }
   };
 
+  // Insert a canned response into the reply box + apply its one-click actions.
+  const applyMacro = async (m) => {
+    setShowMacros(false);
+    if (m.body) setReply((r) => (r ? `${r}\n\n${m.body}` : m.body));
+    const payload = {};
+    if (m.actions?.status) payload.status = m.actions.status;
+    if (m.actions?.priority) payload.priority = m.actions.priority;
+    if (m.actions?.addTags?.length) {
+      payload.tags = Array.from(new Set([...(ticket.tags || []), ...m.actions.addTags]));
+    }
+    if (Object.keys(payload).length) await patch(payload, `Applied “${m.title}”`);
+    else toast.success(`Inserted “${m.title}”`);
+  };
+
+  const setTags = (tags) => patch({ tags }, 'Tags updated');
+  const addTag = (name) => {
+    setShowTagMenu(false);
+    const t = (name || '').trim();
+    if (!t || (ticket.tags || []).includes(t)) return;
+    setTags([...(ticket.tags || []), t]);
+  };
+  const removeTag = (name) => setTags((ticket.tags || []).filter((t) => t !== name));
+  const createTag = async (name) => {
+    const t = (name || '').trim();
+    if (!t) return;
+    try {
+      const { data } = await api.post('/tags', { name: t, color: '#64748b' });
+      setAllTags((prev) => [...prev, data.tag]);
+      addTag(t);
+    } catch (err) {
+      if (err.response?.status === 409) addTag(t);
+      else toast.error(err.response?.data?.message || 'Could not create tag');
+    }
+  };
+
+  const submitCsat = async () => {
+    if (!csat.rating) return toast.error('Pick a star rating first');
+    setCsat((c) => ({ ...c, busy: true }));
+    try {
+      const { data } = await api.post(`/tickets/${id}/csat`, { rating: csat.rating, comment: csat.comment });
+      setTicket(data.ticket);
+      toast.success('Thanks for your feedback!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not submit rating');
+    } finally {
+      setCsat((c) => ({ ...c, busy: false }));
+    }
+  };
+
   const removeTicket = async () => {
     if (!confirm('Delete this ticket permanently?')) return;
     await api.delete(`/tickets/${id}`);
@@ -142,6 +201,11 @@ export default function TicketDetail() {
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <div className="flex flex-wrap items-center gap-2">
+            {ticket.escalationLevel > 0 && (
+              <span className="chip bg-red-50 text-red-600" title="Auto-escalated by the SLA engine">
+                <AlertTriangle className="h-3 w-3" /> Escalated ×{ticket.escalationLevel}
+              </span>
+            )}
             <SlaBadge ticket={ticket} />
             <PriorityBadge priority={ticket.priority} />
             <StatusBadge status={ticket.status} />
@@ -217,6 +281,25 @@ export default function TicketDetail() {
                   className="btn-ghost !px-3" title="Attach files">
                   <Paperclip className="h-4 w-4" /> {uploading ? 'Uploading…' : 'Attach'}
                 </button>
+                {staff && macros.length > 0 && (
+                  <div className="relative">
+                    <button type="button" onClick={() => setShowMacros((s) => !s)}
+                      className="btn-ghost !px-3" title="Insert a canned response">
+                      <MessageSquareText className="h-4 w-4" /> Canned
+                    </button>
+                    {showMacros && (
+                      <div className="absolute bottom-full left-0 z-20 mb-2 max-h-64 w-72 overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lift">
+                        {macros.map((m) => (
+                          <button key={m._id} type="button" onClick={() => applyMacro(m)}
+                            className="block w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50">
+                            <div className="text-sm font-medium text-slate-700">{m.title}</div>
+                            {m.body && <div className="truncate text-xs text-slate-400">{m.body}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {staff && (
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-500">
                     <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-brand-600"
@@ -341,6 +424,64 @@ export default function TicketDetail() {
               </>
             )}
           </div>
+
+          {/* Tags (staff) */}
+          {staff && (
+            <div className="card p-5 space-y-3">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                <TagIcon className="h-4 w-4" /> Tags
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {(ticket.tags || []).length === 0 && <span className="text-xs text-slate-400">No tags yet</span>}
+                {(ticket.tags || []).map((t) => {
+                  const meta = allTags.find((x) => x.name === t);
+                  return <TagChip key={t} name={t} color={meta?.color} onRemove={() => removeTag(t)} />;
+                })}
+              </div>
+              <div className="relative">
+                <button type="button" onClick={() => setShowTagMenu((s) => !s)} className="btn-ghost !px-3 !py-1.5 text-xs">
+                  <Plus className="h-3.5 w-3.5" /> Add tag
+                </button>
+                {showTagMenu && (
+                  <TagMenu allTags={allTags} current={ticket.tags || []} onPick={addTag} onCreate={createTag} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* CSAT — client rates once resolved; staff sees the score */}
+          {!staff && ['resolved', 'closed'].includes(ticket.status) && (
+            <div className="card p-5 space-y-3">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                <Star className="h-4 w-4" /> Rate the support
+              </h3>
+              {ticket.csat?.rating ? (
+                <div className="space-y-1">
+                  <Stars value={ticket.csat.rating} />
+                  {ticket.csat.comment && <p className="text-sm text-slate-500">“{ticket.csat.comment}”</p>}
+                  <p className="text-xs text-slate-400">Thanks for your feedback!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Stars value={csat.rating} onChange={(n) => setCsat((c) => ({ ...c, rating: n }))} />
+                  <textarea className="input min-h-[70px] resize-y text-sm" placeholder="Anything to add? (optional)"
+                    value={csat.comment} onChange={(e) => setCsat((c) => ({ ...c, comment: e.target.value }))} />
+                  <button onClick={submitCsat} disabled={csat.busy} className="btn-primary w-full">
+                    {csat.busy ? 'Submitting…' : 'Submit rating'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {staff && ticket.csat?.rating && (
+            <div className="card p-5 space-y-2">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                <Star className="h-4 w-4" /> Customer rating
+              </h3>
+              <Stars value={ticket.csat.rating} />
+              {ticket.csat.comment && <p className="text-sm text-slate-500">“{ticket.csat.comment}”</p>}
+            </div>
+          )}
 
           {/* Activity (staff only) */}
           {staff && ticket.activity?.length > 0 && (
@@ -469,6 +610,57 @@ function Control({ icon: Icon, label, children }) {
         <Icon className="h-3.5 w-3.5" /> {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+// Dropdown for picking an existing managed tag or creating a new one inline.
+function TagMenu({ allTags, current, onPick, onCreate }) {
+  const [q, setQ] = useState('');
+  const avail = allTags.filter(
+    (t) => !current.includes(t.name) && t.name.toLowerCase().includes(q.toLowerCase())
+  );
+  const exact = allTags.some((t) => t.name.toLowerCase() === q.trim().toLowerCase());
+  return (
+    <div className="absolute left-0 top-full z-20 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-lift">
+      <input
+        autoFocus
+        className="input !py-1.5 text-sm"
+        placeholder="Find or create a tag…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && q.trim()) {
+            e.preventDefault();
+            onCreate(q.trim());
+            setQ('');
+          }
+        }}
+      />
+      <div className="mt-1 max-h-40 overflow-auto">
+        {avail.map((t) => (
+          <button
+            key={t._id}
+            type="button"
+            onClick={() => onPick(t.name)}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-50"
+          >
+            <span className="h-2 w-2 rounded-full" style={{ background: t.color }} /> {t.name}
+          </button>
+        ))}
+        {q.trim() && !exact && (
+          <button
+            type="button"
+            onClick={() => { onCreate(q.trim()); setQ(''); }}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-brand-600 hover:bg-brand-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> Create “{q.trim()}”
+          </button>
+        )}
+        {avail.length === 0 && !q.trim() && (
+          <div className="px-2 py-1.5 text-xs text-slate-400">Type to create a tag</div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import {
-  LayoutDashboard, Ticket, Users, Plus, LogOut, Menu, X, Headphones, Settings as SettingsIcon,
+  LayoutDashboard, Ticket, Users, Plus, LogOut, Menu, X, Headphones,
+  Settings as SettingsIcon, MessageSquareText,
 } from 'lucide-react';
-import { useAuth } from '../store/auth';
+import { useAuth, STAFF_ROLES } from '../store/auth';
 import { useSettings } from '../store/settings';
 import { Avatar, RoleBadge } from './ui';
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
+  { to: '/macros', label: 'Canned Responses', icon: MessageSquareText, roles: STAFF_ROLES },
   { to: '/users', label: 'Team & Clients', icon: Users, roles: ['admin'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, roles: ['admin'] },
 ];

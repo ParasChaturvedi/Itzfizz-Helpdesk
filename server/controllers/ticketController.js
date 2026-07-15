@@ -55,6 +55,17 @@ async function slaDueFrom(priority, from = new Date()) {
   return new Date(from.getTime() + hours * 3600 * 1000);
 }
 
+// Compute both the resolution and first-response SLA targets for a priority.
+async function slaDatesFor(priority, from = new Date()) {
+  const s = await Settings.get();
+  const resHours = s.slaHours?.[priority] ?? 24;
+  const frHours = s.slaFirstResponseHours?.[priority] ?? Math.max(1, Math.round(resHours / 4));
+  return {
+    slaDueAt: new Date(from.getTime() + resHours * 3600 * 1000),
+    firstResponseDueAt: new Date(from.getTime() + frHours * 3600 * 1000),
+  };
+}
+
 // Each notify* returns a promise that settles only once every send finishes, so
 // background()/waitUntil can keep the serverless function alive until then.
 
@@ -132,13 +143,14 @@ function serialize(ticket, user) {
 
 // GET /api/tickets  — role-scoped list with filters
 exports.list = async (req, res) => {
-  const { status, priority, department, assignee, mine, q } = req.query;
+  const { status, priority, department, assignee, mine, q, tag } = req.query;
   const filter = { ...scopeFor(req.user) };
 
   if (status) filter.status = status;
   if (priority) filter.priority = priority;
   if (department) filter.department = department;
   if (assignee) filter.assignee = assignee;
+  if (tag) filter.tags = tag;
   if (mine === 'true' && isStaff(req.user)) filter.assignee = req.user._id;
   if (q) filter.$or = [
     { subject: new RegExp(q, 'i') },
@@ -159,12 +171,21 @@ exports.list = async (req, res) => {
 // GET /api/tickets/stats  — dashboard cards
 exports.stats = async (req, res) => {
   const base = scopeFor(req.user);
-  const [byStatus, byPriority, total, mine, unassigned] = await Promise.all([
+  const [byStatus, byPriority, total, mine, unassigned, breached, csatAgg] = await Promise.all([
     Ticket.aggregate([{ $match: base }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
     Ticket.aggregate([{ $match: base }, { $group: { _id: '$priority', n: { $sum: 1 } } }]),
     Ticket.countDocuments(base),
     isStaff(req.user) ? Ticket.countDocuments({ assignee: req.user._id }) : 0,
     isAdmin(req.user) ? Ticket.countDocuments({ assignee: null }) : 0,
+    Ticket.countDocuments({
+      ...base,
+      slaBreachedAt: { $exists: true },
+      status: { $in: ['open', 'in_progress', 'on_hold'] },
+    }),
+    Ticket.aggregate([
+      { $match: { ...base, 'csat.rating': { $gte: 1 } } },
+      { $group: { _id: null, avg: { $avg: '$csat.rating' }, n: { $sum: 1 } } },
+    ]),
   ]);
 
   const toMap = (rows) => rows.reduce((a, r) => ({ ...a, [r._id]: r.n }), {});
@@ -172,6 +193,8 @@ exports.stats = async (req, res) => {
     total,
     mine,
     unassigned,
+    breached,
+    csat: csatAgg[0] ? { avg: Math.round(csatAgg[0].avg * 10) / 10, count: csatAgg[0].n } : { avg: 0, count: 0 },
     byStatus: toMap(byStatus),
     byPriority: toMap(byPriority),
   });
@@ -226,7 +249,7 @@ exports.create = async (req, res) => {
     subject,
     priority: prio,
     department: dept,
-    slaDueAt: await slaDueFrom(prio),
+    ...(await slaDatesFor(prio)),
     requester: req.user._id,
     requesterEmail: req.user.email,
     requesterName: req.user.name,
@@ -350,6 +373,39 @@ exports.markRead = async (req, res) => {
   res.json({ ok: true });
 };
 
+// POST /api/tickets/:id/csat  — the client rates the support (1–5) once resolved.
+exports.submitCsat = async (req, res) => {
+  const rating = Number(req.body.rating);
+  if (!(rating >= 1 && rating <= 5)) {
+    return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+  }
+  const ticket = await Ticket.findById(req.params.id);
+  if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+  // Only the ticket owner may rate it, and only after it's resolved/closed.
+  if (String(ticket.requester || '') !== String(req.user._id)) {
+    return res.status(403).json({ message: 'Only the ticket owner can rate it' });
+  }
+  if (!['resolved', 'closed'].includes(ticket.status)) {
+    return res.status(400).json({ message: 'You can rate the support once your ticket is resolved' });
+  }
+
+  ticket.csat = {
+    rating,
+    comment: String(req.body.comment || '').slice(0, 1000),
+    submittedAt: new Date(),
+  };
+  ticket.activity.push({
+    actor: req.user._id,
+    actorName: req.user.name,
+    action: `rated the support ${rating}/5`,
+  });
+  await ticket.save();
+
+  const populated = await ticket.populate(RECEIPT_POP);
+  res.json({ ticket: serialize(populated, req.user) });
+};
+
 // PATCH /api/tickets/:id  — staff updates fields (status, assignee, etc.)
 exports.update = async (req, res) => {
   const ticket = await Ticket.findById(req.params.id);
@@ -382,8 +438,13 @@ exports.update = async (req, res) => {
   if (priority && Ticket.PRIORITIES.includes(priority) && priority !== ticket.priority) {
     ticket.priority = priority;
     changes.push(`set priority to ${priority}`);
-    // Recompute the SLA target from creation time for the new priority.
-    if (!ticket.resolvedAt) ticket.slaDueAt = await slaDueFrom(priority, ticket.createdAt);
+    // Recompute the SLA targets from creation time for the new priority.
+    if (!ticket.resolvedAt) {
+      const { slaDueAt, firstResponseDueAt } = await slaDatesFor(priority, ticket.createdAt);
+      ticket.slaDueAt = slaDueAt;
+      if (!ticket.firstResponseAt) ticket.firstResponseDueAt = firstResponseDueAt;
+      ticket.slaWarned = false; // allow a fresh approaching-breach warning
+    }
   }
   if (department && Ticket.DEPARTMENTS.includes(department) && department !== ticket.department) {
     ticket.department = department;
